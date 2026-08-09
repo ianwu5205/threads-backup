@@ -1,7 +1,15 @@
 {
-  "name": "threads-backup-cli",
+  "name": "threads-backup",
   "version": "0.1.0",
   "description": "Back up your Threads posts and media with the official Threads API.",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ianwu5205/threads-backup.git"
+  },
+  "homepage": "https://github.com/ianwu5205/threads-backup#readme",
+  "bugs": {
+    "url": "https://github.com/ianwu5205/threads-backup/issues"
+  },
   "type": "module",
   "bin": {
     "threadsBackup": "dist/cli.js"
@@ -14,8 +22,10 @@
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
     "check": "tsc --noEmit",
-    "test": "node --test --experimental-strip-types test/*.test.ts"
+    "test": "node --test --experimental-strip-types test/*.test.ts",
+    "prepack": "pnpm check && pnpm test && pnpm build"
   },
+  "packageManager": "pnpm@10.30.3",
   "engines": {
     "node": ">=24"
   },

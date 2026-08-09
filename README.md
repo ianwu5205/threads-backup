@@ -6,7 +6,6 @@ and carousel media with the official Threads API.
 ## Requirements
 
 - Node.js 24 or newer
-- pnpm
 - A Meta app with the **Threads API** use case
 - `cloudflared` when using the default Quick Tunnel login flow
 
@@ -17,13 +16,10 @@ your Threads account as an app tester and accept the invitation in Threads.
 ## Install
 
 ```sh
-pnpm install
-cp .env.example .env
-pnpm build
-pnpm link --global
+npm install --global threads-backup
 ```
 
-Set the required values in `.env`:
+Create a `.env` file in the directory where backups should be saved:
 
 ```dotenv
 THREADS_APP_ID=your_threads_app_id
@@ -31,7 +27,8 @@ THREADS_APP_SECRET=your_threads_app_secret
 PORT=8787
 ```
 
-`.env`, `.credentials/`, and `.out/` are ignored by Git.
+The CLI stores credentials in `.credentials/` and backups in `.out/` in that
+same directory. Do not commit any of these files.
 
 ## First login with a Quick Tunnel
 
