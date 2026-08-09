@@ -4,12 +4,12 @@ import { loadEnvFile } from 'node:process'
 import { backupPosts } from './backup.ts'
 import { getCredentials } from './oauth.ts'
 
-const help = `threadsBackup - back up your Threads posts and media
+const help = `threads-backup - back up your Threads posts and media
 
 Usage:
-  threadsBackup [--resume | --full-backup]
-  threadsBackup --help
-  threadsBackup --version
+  threads-backup [--resume | --full-backup]
+  threads-backup --help
+  threads-backup --version
 
 Options:
   --resume       Skip completed posts and continue through all pages

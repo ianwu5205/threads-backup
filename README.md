@@ -1,4 +1,4 @@
-# threadsBackup
+# threads-backup
 
 Back up your own Threads posts and attached images, videos, GIFs, thumbnails,
 and carousel media with the official Threads API.
@@ -45,7 +45,7 @@ winget install --id Cloudflare.cloudflared
 Run the CLI:
 
 ```sh
-threadsBackup
+threads-backup
 ```
 
 When authorization is needed, the CLI starts a local callback server and runs:
@@ -91,16 +91,16 @@ the CLI is stopped after OAuth; an already-running connector is left alone.
 
 ```sh
 # Stop when the newest existing backup is reached
-threadsBackup
+threads-backup
 
 # Skip completed posts and continue an interrupted backup
-threadsBackup --resume
+threads-backup --resume
 
 # Re-fetch every post and attached media
-threadsBackup --full-backup
+threads-backup --full-backup
 
-threadsBackup --help
-threadsBackup --version
+threads-backup --help
+threads-backup --version
 ```
 
 The default mode is incremental: posts are returned newest first, and the CLI
