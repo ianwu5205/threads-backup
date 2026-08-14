@@ -6,10 +6,12 @@ import { test } from 'node:test'
 import { backupPosts, mediaReferences, postDirectory } from '../src/backup.ts'
 
 test('postDirectory uses the UTC post timestamp and requested layout', () => {
+  const post = { id: '17977704596464643', timestamp: '2023-07-06T04:35:02Z' }
   assert.equal(
-    postDirectory('/work', { id: '17977704596464643', timestamp: '2023-07-06T04:35:02Z' }),
-    join('/work', '.out/2023/2023-07-06-04-35-02-17977704596464643'),
+    postDirectory('/work', post),
+    join('/work', 'backups/2023/2023-07-06-04-35-02-17977704596464643'),
   )
+  assert.equal(postDirectory('/work', post, 'archive'), join('/work', 'archive/2023/2023-07-06-04-35-02-17977704596464643'))
 })
 
 test('mediaReferences includes children and deduplicates URLs', () => {
@@ -22,6 +24,27 @@ test('mediaReferences includes children and deduplicates URLs', () => {
     { id: 'post1', kind: 'media', url: 'https://cdn.example/a.jpg' },
     { id: 'child1', kind: 'gif', url: 'https://cdn.example/b.gif' },
   ])
+})
+
+test('backup logs each UTC day once', async () => {
+  const cwd = await mkdtemp(join(tmpdir(), 'threads-backup-'))
+  const originalFetch = globalThis.fetch
+  const originalLog = console.log
+  const logs: string[] = []
+  globalThis.fetch = async () => Response.json({ data: [
+    { id: 'one', timestamp: '2026-08-07T01:02:03Z' },
+    { id: 'two', timestamp: '2026-08-07T23:59:59Z' },
+    { id: 'three', timestamp: '2026-08-06T23:59:59Z' },
+  ] })
+  console.log = (message) => logs.push(String(message))
+  try {
+    await backupPosts(cwd, 'token')
+    assert.deepEqual(logs, ['Download 2026-08-07 post.', 'Download 2026-08-06 post.'])
+  } finally {
+    globalThis.fetch = originalFetch
+    console.log = originalLog
+    await rm(cwd, { recursive: true })
+  }
 })
 
 test('incremental stops at existing, resume skips existing, and full overwrites all', async () => {

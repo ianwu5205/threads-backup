@@ -1,19 +1,23 @@
 #!/usr/bin/env node
 import { existsSync, readFileSync } from 'node:fs'
 import { loadEnvFile } from 'node:process'
+import { debuglog } from 'node:util'
 import { backupPosts } from './backup.ts'
 import { getCredentials } from './oauth.ts'
+
+const debug = debuglog('threads-backup')
 
 const help = `threads-backup - back up your Threads posts and media
 
 Usage:
-  threads-backup [--resume | --full-backup]
+  threads-backup [--resume | --full-backup] [--backup-folder <path>]
   threads-backup --help
   threads-backup --version
 
 Options:
   --resume       Skip completed posts and continue through all pages
   --full-backup  Re-fetch every post and media file
+  --backup-folder <path>  Save backups in this folder (default: backups)
   -h, --help     Show this help
   -v, --version  Show the version
 `
@@ -38,7 +42,10 @@ async function main(): Promise<void> {
     console.log(packageVersion())
     return
   }
-  const unknown = args.filter((argument) => !['--resume', '--full-backup'].includes(argument))
+  const folderIndex = args.indexOf('--backup-folder')
+  const backupFolder = folderIndex === -1 ? 'backups' : args[folderIndex + 1]
+  if (!backupFolder || backupFolder.startsWith('-')) throw new Error('--backup-folder requires a path')
+  const unknown = args.filter((argument, index) => !['--resume', '--full-backup', '--backup-folder'].includes(argument) && index !== folderIndex + 1)
   if (unknown.length) throw new Error(`Unknown option: ${unknown[0]}`)
   if (args.includes('--resume') && args.includes('--full-backup')) throw new Error('--resume and --full-backup cannot be used together')
 
@@ -55,8 +62,9 @@ async function main(): Promise<void> {
     port,
     cwd,
   })
-  const summary = await backupPosts(cwd, credentials.access_token, args.includes('--full-backup'), args.includes('--resume'))
-  console.log(`${new Date()},INFO,cli.main,saved ${summary.saved} posts; ${summary.failed} failed.`)
+  const summary = await backupPosts(cwd, credentials.access_token, args.includes('--full-backup'), args.includes('--resume'), backupFolder)
+  const message = `Saved ${summary.saved} posts with ${summary.failed} failures.`
+  console.log(message)
   if (summary.failed) process.exitCode = 1
 }
 

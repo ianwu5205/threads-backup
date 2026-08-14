@@ -8,6 +8,7 @@ import { join } from 'node:path'
 import { createInterface } from 'node:readline/promises'
 import { stdin, stdout } from 'node:process'
 import { setTimeout as delay } from 'node:timers/promises'
+import { debuglog } from 'node:util'
 import { atomicWrite } from './files.ts'
 import {
   authUrl,
@@ -19,6 +20,7 @@ import {
   type Credentials,
 } from './threads.ts'
 
+const debug = debuglog('threads-backup')
 const callbackPath = '/oauth/callback'
 const refreshBeforeMs = 7 * 24 * 60 * 60 * 1000
 
@@ -34,7 +36,7 @@ type OAuthConfig = {
 type TunnelStatus = { name: string, connections?: unknown[] }
 
 function log(type: 'INFO' | 'WARNING' | 'ERROR', method: string, message: string): void {
-  console.log(`${new Date()},${type},${method},${message}.`)
+  debug(`${new Date()},${type},${method},${message}.`)
 }
 
 /** Validate a fixed OAuth callback URL. */

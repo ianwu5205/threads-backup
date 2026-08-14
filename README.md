@@ -27,7 +27,7 @@ THREADS_APP_SECRET=your_threads_app_secret
 PORT=8787
 ```
 
-The CLI stores credentials in `.credentials/` and backups in `.out/` in that
+The CLI stores credentials in `.credentials/` and backups in `backups/` in that
 same directory. Do not commit any of these files.
 
 ## First login with a Quick Tunnel
@@ -99,6 +99,9 @@ threads-backup --resume
 # Re-fetch every post and attached media
 threads-backup --full-backup
 
+# Save backups in another folder
+threads-backup --backup-folder ./archive
+
 threads-backup --help
 threads-backup --version
 ```
@@ -110,12 +113,20 @@ missing posts left by an interrupted run.
 `--full-backup` overwrites files returned by the API but does not delete unknown
 files from an existing backup directory.
 
+## Debug logging
+
+Enable detailed post and media download logs with `NODE_DEBUG=threads-backup`:
+
+```sh
+NODE_DEBUG=threads-backup threads-backup
+```
+
 ## Output
 
 Post timestamps are converted to UTC:
 
 ```text
-.out/
+backups/
 └── 2023/
     └── 2023-07-06-04-35-02-17977704596464643/
         ├── 17977704596464643.json

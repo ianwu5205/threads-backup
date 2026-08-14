@@ -1,7 +1,10 @@
 import { access } from 'node:fs/promises'
-import { extname, join } from 'node:path'
+import { extname, join, resolve } from 'node:path'
+import { debuglog } from 'node:util'
 import { atomicDownload, atomicWrite } from './files.ts'
 import { fetchThreadMedia, fetchThreadsPage, type ThreadsPost } from './threads.ts'
+
+const debug = debuglog('threads-backup')
 
 export type BackupSummary = { saved: number, failed: number, stoppedAtExisting: boolean }
 
@@ -17,7 +20,7 @@ function pad(value: number): string {
 }
 
 /** Return the requested output directory for one post. */
-export function postDirectory(cwd: string, post: ThreadsPost): string {
+export function postDirectory(cwd: string, post: ThreadsPost, backupFolder = 'backups'): string {
   const date = new Date(String(post.timestamp ?? ''))
   if (Number.isNaN(date.valueOf())) throw new Error(`Post ${post.id} has an invalid timestamp`)
   const stamp = [
@@ -28,11 +31,11 @@ export function postDirectory(cwd: string, post: ThreadsPost): string {
     pad(date.getUTCMinutes()),
     pad(date.getUTCSeconds()),
   ].join('-')
-  return join(cwd, '.out', String(date.getUTCFullYear()), `${stamp}-${safeId(post.id)}`)
+  return join(resolve(cwd, backupFolder), String(date.getUTCFullYear()), `${stamp}-${safeId(post.id)}`)
 }
 
-function jsonPath(cwd: string, post: ThreadsPost): string {
-  return join(postDirectory(cwd, post), `${safeId(post.id)}.json`)
+function jsonPath(cwd: string, post: ThreadsPost, backupFolder: string): string {
+  return join(postDirectory(cwd, post, backupFolder), `${safeId(post.id)}.json`)
 }
 
 async function exists(path: string): Promise<boolean> {
@@ -90,37 +93,46 @@ function mediaExtension(url: string, contentType: string | null): string {
   return mimeExtensions[contentType?.split(';', 1)[0].trim().toLowerCase() ?? ''] ?? '.bin'
 }
 
-async function savePost(cwd: string, post: ThreadsPost, accessToken: string): Promise<void> {
+async function savePost(cwd: string, post: ThreadsPost, accessToken: string, backupFolder: string): Promise<void> {
   const enriched = await withChildMedia(post, accessToken)
-  const directory = postDirectory(cwd, enriched)
+  const directory = postDirectory(cwd, enriched, backupFolder)
+  const datetime = new Date(String(enriched.timestamp)).toISOString()
   for (const media of mediaReferences(enriched)) {
     const response = await fetch(media.url)
     if (!response.ok) throw new Error(`Media download failed (${response.status}): ${media.url}`)
     const path = join(directory, `${media.id}-${media.kind}${mediaExtension(media.url, response.headers.get('content-type'))}`)
-    console.log(`${new Date()},INFO,backup.savePost,download ${path}.`)
+    debug(`Download ${datetime} image in ${path}.`)
     await atomicDownload(path, response)
   }
-  await atomicWrite(jsonPath(cwd, enriched), `${JSON.stringify(enriched, null, 2)}\n`)
+  const path = jsonPath(cwd, enriched, backupFolder)
+  debug(`Download ${datetime} post in ${path}.`)
+  await atomicWrite(path, `${JSON.stringify(enriched, null, 2)}\n`)
 }
 
 /** Back up new posts, all posts, or resume past existing posts. */
-export async function backupPosts(cwd: string, accessToken: string, fullBackup = false, resume = false): Promise<BackupSummary> {
+export async function backupPosts(cwd: string, accessToken: string, fullBackup = false, resume = false, backupFolder = 'backups'): Promise<BackupSummary> {
   const summary: BackupSummary = { saved: 0, failed: 0, stoppedAtExisting: false }
+  const loggedDays = new Set<string>()
   let nextUrl: string | undefined
   do {
     const page = await fetchThreadsPage(accessToken, nextUrl)
     for (const post of page.data ?? []) {
-      if (!fullBackup && await exists(jsonPath(cwd, post))) {
+      if (!fullBackup && await exists(jsonPath(cwd, post, backupFolder))) {
         if (resume) continue
         summary.stoppedAtExisting = true
         return summary
       }
       try {
-        await savePost(cwd, post, accessToken)
+        const day = new Date(String(post.timestamp)).toISOString().slice(0, 10)
+        if (!loggedDays.has(day)) {
+          console.log(`Download ${day} post.`)
+          loggedDays.add(day)
+        }
+        await savePost(cwd, post, accessToken, backupFolder)
         summary.saved++
       } catch (error) {
         summary.failed++
-        console.error(`${new Date()},ERROR,backup.backupPosts,post ${post.id} failed: ${error instanceof Error ? error.message : String(error)}.`)
+        debug(`${new Date()},ERROR,backup.backupPosts,post ${post.id} failed: ${error instanceof Error ? error.message : String(error)}.`)
       }
     }
     nextUrl = page.paging?.next

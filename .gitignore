@@ -3,5 +3,6 @@ dist/
 .env
 .credentials
 .out/
+backups/
 *.log
 .DS_Store
