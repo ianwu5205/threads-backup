@@ -69,6 +69,6 @@ async function main(): Promise<void> {
 }
 
 main().catch((error) => {
-  console.error(`${new Date()},ERROR,cli.main,${error instanceof Error ? error.message : String(error)}.`)
+  console.error(error instanceof Error ? error.message : String(error))
   process.exitCode = 1
 })

@@ -132,7 +132,7 @@ export async function backupPosts(cwd: string, accessToken: string, fullBackup =
         summary.saved++
       } catch (error) {
         summary.failed++
-        debug(`${new Date()},ERROR,backup.backupPosts,post ${post.id} failed: ${error instanceof Error ? error.message : String(error)}.`)
+        debug(`Post ${post.id} failed: ${error instanceof Error ? error.message : String(error)}.`)
       }
     }
     nextUrl = page.paging?.next

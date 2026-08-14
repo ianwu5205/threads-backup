@@ -35,8 +35,8 @@ type OAuthConfig = {
 
 type TunnelStatus = { name: string, connections?: unknown[] }
 
-function log(type: 'INFO' | 'WARNING' | 'ERROR', method: string, message: string): void {
-  debug(`${new Date()},${type},${method},${message}.`)
+function log(message: string): void {
+  debug(message)
 }
 
 /** Validate a fixed OAuth callback URL. */
@@ -60,9 +60,9 @@ export function tunnelStatus(output: string, name: string): TunnelStatus | undef
 }
 
 function installHint(): string {
-  if (process.platform === 'darwin') return 'Install cloudflared with: brew install cloudflared'
-  if (process.platform === 'win32') return 'Install cloudflared with: winget install --id Cloudflare.cloudflared'
-  return 'Install cloudflared: https://developers.cloudflare.com/cloudflare-one/networks/connectors/cloudflare-tunnel/downloads/'
+  if (process.platform === 'darwin') return 'No cloudflared command. Install cloudflared first. e.g: brew install cloudflared'
+  if (process.platform === 'win32') return 'No cloudflared command. Install cloudflared first. e.g: winget install --id Cloudflare.cloudflared'
+  return 'No cloudflared command. Install cloudflared first: https://developers.cloudflare.com/cloudflare-one/networks/connectors/cloudflare-tunnel/downloads/'
 }
 
 async function listen(server: Server, port: number): Promise<void> {
@@ -114,7 +114,7 @@ async function ensureFixedTunnel(name: string, redirectUri: string, port: number
   if (!status) throw new Error(`Cloudflare tunnel not found: ${name}`)
   if (status.connections?.length) {
     await waitForCallback(redirectUri)
-    log('INFO', 'oauth.ensureFixedTunnel', `using active tunnel ${name}`)
+    log(`Using active tunnel ${name}.`)
     return undefined
   }
 
@@ -139,7 +139,7 @@ async function ensureFixedTunnel(name: string, redirectUri: string, port: number
     })
     await waitForCallback(redirectUri, child)
     if (startError) throw startError
-    log('INFO', 'oauth.ensureFixedTunnel', `started tunnel ${name}`)
+    log(`Started tunnel ${name}.`)
     return child
   } catch (error) {
     child?.kill('SIGTERM')
@@ -303,7 +303,7 @@ async function authorize(config: OAuthConfig, credentialsPath: string): Promise<
     const profile = await fetchThreadsProfile(longToken.access_token)
     const credentials = credentialsFromToken(longToken, profile.id, profile.username)
     await saveCredentials(credentialsPath, credentials)
-    log('INFO', 'oauth.authorize', `saved ${credentialPath(credentialsPath, profile.username)}`)
+    log(`Saved ${credentialPath(credentialsPath, profile.username)}.`)
     return credentials
   } finally {
     process.off('SIGINT', onSignal)
@@ -323,7 +323,7 @@ export async function getCredentials(config: OAuthConfig): Promise<Credentials> 
       credentials = { ...credentials, user_id: profile.id, username: profile.username }
       await saveCredentials(path, credentials)
     } catch (error) {
-      log('WARNING', 'oauth.getCredentials', `legacy credential lookup failed; starting OAuth (${error instanceof Error ? error.message : String(error)})`)
+      log(`Legacy credential lookup failed; starting OAuth (${error instanceof Error ? error.message : String(error)}).`)
       credentials = undefined
     }
   }
@@ -334,10 +334,10 @@ export async function getCredentials(config: OAuthConfig): Promise<Credentials> 
       const token = await refreshLongLivedToken(credentials.access_token)
       const refreshed = credentialsFromToken(token, credentials.user_id, credentials.username)
       await saveCredentials(path, refreshed)
-      log('INFO', 'oauth.getCredentials', 'refreshed access token')
+      log('Refreshed access token.')
       return refreshed
     } catch (error) {
-      log('WARNING', 'oauth.getCredentials', `token refresh failed; starting OAuth (${error instanceof Error ? error.message : String(error)})`)
+      log(`Token refresh failed; starting OAuth (${error instanceof Error ? error.message : String(error)}).`)
     }
   }
 
