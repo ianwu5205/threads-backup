@@ -1,6 +1,6 @@
 {
   "name": "threads-backup",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Back up your Threads posts and media with the official Threads API.",
   "repository": {
     "type": "git",
