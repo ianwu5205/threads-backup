@@ -97,7 +97,7 @@ async function runCloudflared(args: string[]): Promise<string> {
 async function waitForCallback(redirectUri: string, child?: ChildProcessWithoutNullStreams): Promise<void> {
   const healthUrl = new URL('/health', redirectUri)
   for (let attempt = 0; attempt < 30; attempt++) {
-    if (child?.exitCode !== null) throw new Error(`cloudflared exited before ${healthUrl.origin} became reachable`)
+    if (child && child.exitCode !== null) throw new Error(`cloudflared exited before ${healthUrl.origin} became reachable`)
     try {
       const response = await fetch(healthUrl, { signal: AbortSignal.timeout(2_000) })
       if (response.ok && await response.text() === 'ok') return

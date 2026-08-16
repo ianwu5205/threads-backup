@@ -1,0 +1,521 @@
+<!doctype html>
+<html lang="en" class="scroll-smooth">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="Create a Meta app, configure ThreadsBackup, and add a Threads API tester." />
+    <title>ThreadsBackup setup guide — Complete Meta and Threads API setup</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+  </head>
+  <body class="min-h-screen bg-slate-50 text-slate-900 antialiased">
+    <header class="border-b border-slate-200 bg-white">
+      <div class="mx-auto max-w-5xl px-5 py-10 sm:px-8 sm:py-14">
+        <a href="#main" class="text-sm font-semibold text-sky-700">ThreadsBackup setup guide</a>
+        <h1 class="mt-3 max-w-3xl text-3xl font-bold tracking-tight text-slate-950 sm:text-5xl">
+          Connect ThreadsBackup to the Threads API
+        </h1>
+        <p class="mt-4 max-w-2xl text-base leading-7 text-slate-600 sm:text-lg">
+          Create a Meta developer app, retrieve its credentials, configure a Quick or fixed Cloudflare Tunnel, and authorize your Threads account as a tester.
+        </p>
+
+        <ol aria-label="Setup progress" class="mt-8 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          <li>
+            <a href="#create-meta-app" class="block h-full rounded-xl border border-sky-200 bg-sky-50 p-4 ring-1 ring-sky-100">
+              <span class="text-xs font-bold uppercase tracking-wider text-sky-700">Step 1 of 5</span>
+              <p class="mt-1 font-semibold text-slate-950">Create a Meta app</p>
+            </a>
+          </li>
+          <li>
+            <a href="#get-credentials" class="block h-full rounded-xl border border-sky-200 bg-sky-50 p-4 ring-1 ring-sky-100">
+              <span class="text-xs font-bold uppercase tracking-wider text-sky-700">Step 2 of 5</span>
+              <p class="mt-1 font-semibold text-slate-950">Get app credentials</p>
+            </a>
+          </li>
+          <li>
+            <a href="#setup-callbacks" class="block h-full rounded-xl border border-sky-200 bg-sky-50 p-4 ring-1 ring-sky-100">
+              <span class="text-xs font-bold uppercase tracking-wider text-sky-700">Step 3 of 5</span>
+              <p class="mt-1 font-semibold text-slate-950">Set up callback URLs</p>
+            </a>
+          </li>
+          <li>
+            <a href="#fixed-tunnel" class="block h-full rounded-xl border border-amber-200 bg-amber-50 p-4 ring-1 ring-amber-100">
+              <span class="text-xs font-bold uppercase tracking-wider text-amber-700">Optional alternative</span>
+              <p class="mt-1 font-semibold text-slate-950">Create a fixed tunnel</p>
+            </a>
+          </li>
+          <li>
+            <a href="#add-tester" class="block h-full rounded-xl border border-sky-200 bg-sky-50 p-4 ring-1 ring-sky-100">
+              <span class="text-xs font-bold uppercase tracking-wider text-sky-700">Step 4 of 5</span>
+              <p class="mt-1 font-semibold text-slate-950">Add a Threads tester</p>
+            </a>
+          </li>
+          <li>
+            <a href="#authorize-backup" class="block h-full rounded-xl border border-sky-200 bg-sky-50 p-4 ring-1 ring-sky-100">
+              <span class="text-xs font-bold uppercase tracking-wider text-sky-700">Step 5 of 5</span>
+              <p class="mt-1 font-semibold text-slate-950">Authorize and back up</p>
+            </a>
+          </li>
+        </ol>
+      </div>
+    </header>
+
+    <main id="main" class="mx-auto max-w-5xl px-5 py-10 sm:px-8 sm:py-14">
+      <aside class="mb-12 rounded-xl border border-amber-200 bg-amber-50 p-5" aria-labelledby="before-title">
+        <h2 id="before-title" class="font-semibold text-amber-950">Before you begin</h2>
+        <p class="mt-1 leading-7 text-amber-900">
+          Sign in to <a class="font-semibold underline underline-offset-2" href="https://developers.facebook.com/apps/" target="_blank" rel="noreferrer">Meta for Developers</a>. You will need access to the Facebook account that will own the app.
+        </p>
+      </aside>
+
+      <div id="create-meta-app" class="scroll-mt-6 space-y-16">
+        <section id="create-app" aria-labelledby="create-app-title">
+          <div class="flex gap-4">
+            <span class="flex size-9 shrink-0 items-center justify-center rounded-full bg-slate-950 font-bold text-white">1</span>
+            <div>
+              <h2 id="create-app-title" class="text-2xl font-bold tracking-tight">Start a new app</h2>
+              <p class="mt-2 leading-7 text-slate-600">On the <strong>My Apps</strong> page, select <strong>Create App</strong>.</p>
+            </div>
+          </div>
+          <img class="mt-6 w-full rounded-xl border border-slate-200 bg-white shadow-sm" src="01-create-app.webp" alt="Meta for Developers My Apps page with the Create App button highlighted" width="928" height="560" />
+        </section>
+
+        <section id="app-details" aria-labelledby="app-details-title">
+          <div class="flex gap-4">
+            <span class="flex size-9 shrink-0 items-center justify-center rounded-full bg-slate-950 font-bold text-white">2</span>
+            <div>
+              <h2 id="app-details-title" class="text-2xl font-bold tracking-tight">Enter the app details</h2>
+              <p class="mt-2 leading-7 text-slate-600">Set the app name to <strong>ThreadsBackup</strong>, or choose any name you like. Confirm that the contact email is correct, then select <strong>Next</strong>.</p>
+            </div>
+          </div>
+          <img loading="lazy" class="mt-6 w-full rounded-xl border border-slate-200 bg-white shadow-sm" src="02-enter-app-details.webp" alt="Create an app form with ThreadsBackup entered as the app name and Next highlighted" width="2086" height="856" />
+        </section>
+
+        <section id="threads-api" aria-labelledby="threads-api-title">
+          <div class="flex gap-4">
+            <span class="flex size-9 shrink-0 items-center justify-center rounded-full bg-slate-950 font-bold text-white">3</span>
+            <div>
+              <h2 id="threads-api-title" class="text-2xl font-bold tracking-tight">Select the Threads API use case</h2>
+              <p class="mt-2 leading-7 text-slate-600">Choose <strong>Access the Threads API</strong>, then continue.</p>
+            </div>
+          </div>
+          <img loading="lazy" class="mt-6 w-full rounded-xl border border-slate-200 bg-white shadow-sm" src="03-select-threads-api.webp" alt="Meta app use case list with Access the Threads API selected" width="2092" height="1126" />
+        </section>
+
+        <section id="business" aria-labelledby="business-title">
+          <div class="flex gap-4">
+            <span class="flex size-9 shrink-0 items-center justify-center rounded-full bg-slate-950 font-bold text-white">4</span>
+            <div>
+              <h2 id="business-title" class="text-2xl font-bold tracking-tight">Skip the business portfolio</h2>
+              <p class="mt-2 leading-7 text-slate-600">Select <strong>I don’t want to connect a business portfolio yet</strong>, then select <strong>Next</strong>.</p>
+            </div>
+          </div>
+          <img loading="lazy" class="mt-6 w-full rounded-xl border border-slate-200 bg-white shadow-sm" src="04-skip-business-portfolio.webp" alt="Business portfolio step with the option to not connect a portfolio highlighted" width="2102" height="914" />
+        </section>
+
+        <section id="requirements" aria-labelledby="requirements-title">
+          <div class="flex gap-4">
+            <span class="flex size-9 shrink-0 items-center justify-center rounded-full bg-slate-950 font-bold text-white">5</span>
+            <div>
+              <h2 id="requirements-title" class="text-2xl font-bold tracking-tight">Review the requirements</h2>
+              <p class="mt-2 leading-7 text-slate-600">If no publishing requirements are listed, select <strong>Next</strong>.</p>
+            </div>
+          </div>
+          <img loading="lazy" class="mt-6 w-full rounded-xl border border-slate-200 bg-white shadow-sm" src="05-review-requirements.webp" alt="Publishing requirements step showing no requirements and the Next button highlighted" width="2086" height="770" />
+        </section>
+
+        <section id="review" aria-labelledby="review-title">
+          <div class="flex gap-4">
+            <span class="flex size-9 shrink-0 items-center justify-center rounded-full bg-slate-950 font-bold text-white">6</span>
+            <div>
+              <h2 id="review-title" class="text-2xl font-bold tracking-tight">Review and create the app</h2>
+              <p class="mt-2 leading-7 text-slate-600">Check the app name, Threads API use case, business choice, and requirements. Then select <strong>Create app</strong>.</p>
+            </div>
+          </div>
+          <img loading="lazy" class="mt-6 w-full rounded-xl border border-slate-200 bg-white shadow-sm" src="06-review-and-create-app.webp" alt="Meta app overview with the Create app button highlighted" width="1706" height="1318" />
+        </section>
+
+        <section id="confirm" aria-labelledby="confirm-title">
+          <div class="flex gap-4">
+            <span class="flex size-9 shrink-0 items-center justify-center rounded-full bg-slate-950 font-bold text-white">7</span>
+            <div>
+              <h2 id="confirm-title" class="text-2xl font-bold tracking-tight">Confirm your password</h2>
+              <p class="mt-2 leading-7 text-slate-600">Re-enter your Facebook password and select <strong>Submit</strong>. Your Meta app is now created.</p>
+            </div>
+          </div>
+          <img loading="lazy" class="mt-6 w-full rounded-xl border border-slate-200 bg-white shadow-sm" src="07-confirm-password.webp" alt="Facebook password confirmation dialog with Submit highlighted" width="1038" height="550" />
+        </section>
+      </div>
+
+      <section class="mt-16 rounded-2xl bg-slate-950 p-6 text-white sm:p-8" aria-labelledby="complete-title">
+        <p class="text-sm font-bold uppercase tracking-wider text-sky-300">Step 1 complete</p>
+        <h2 id="complete-title" class="mt-2 text-2xl font-bold">Your Meta app is ready</h2>
+        <p class="mt-2 max-w-2xl leading-7 text-slate-300">Continue below to find the credentials that ThreadsBackup will use.</p>
+      </section>
+
+      <section id="get-credentials" class="scroll-mt-6 pt-20" aria-labelledby="credentials-title">
+        <p class="text-sm font-bold uppercase tracking-wider text-sky-700">Step 2 of 5</p>
+        <h2 id="credentials-title" class="mt-2 text-3xl font-bold tracking-tight text-slate-950 sm:text-4xl">Get the Threads app ID and app secret</h2>
+        <p class="mt-4 max-w-3xl text-lg leading-8 text-slate-600">Open the Threads API settings in your new Meta app, then copy the two credentials you will need in Step 3.</p>
+
+        <div class="mt-12 space-y-16">
+          <section aria-labelledby="open-settings-title">
+            <div class="flex gap-4">
+              <span class="flex size-9 shrink-0 items-center justify-center rounded-full bg-slate-950 font-bold text-white">1</span>
+              <div>
+                <h3 id="open-settings-title" class="text-2xl font-bold tracking-tight">Open the Threads API settings</h3>
+                <p class="mt-2 leading-7 text-slate-600">In your app dashboard, select <strong>Use cases</strong> in the sidebar. Find <strong>Access the Threads API</strong>, then select <strong>Customize</strong>.</p>
+              </div>
+            </div>
+            <img loading="lazy" class="mt-6 w-full rounded-xl border border-slate-200 bg-white shadow-sm" src="08-open-threads-use-case.webp" alt="Meta app dashboard with Use cases and the Threads API Customize button highlighted" width="2810" height="676" />
+          </section>
+
+          <section aria-labelledby="copy-credentials-title">
+            <div class="flex gap-4">
+              <span class="flex size-9 shrink-0 items-center justify-center rounded-full bg-slate-950 font-bold text-white">2</span>
+              <div>
+                <h3 id="copy-credentials-title" class="text-2xl font-bold tracking-tight">Copy the app ID and app secret</h3>
+                <p class="mt-2 leading-7 text-slate-600">On the <strong>Settings</strong> page, copy the <strong>Threads app ID</strong>. Select <strong>Show</strong> beside the <strong>Threads app secret</strong>, confirm your password if prompted, then copy the secret.</p>
+              </div>
+            </div>
+            <div class="mt-5 rounded-xl border border-amber-200 bg-amber-50 p-5 text-amber-950">
+              <p class="font-semibold">Keep the app secret private</p>
+              <p class="mt-1 leading-7">Treat it like a password. Do not post it publicly or commit it to Git.</p>
+            </div>
+            <img loading="lazy" class="mt-6 w-full rounded-xl border border-slate-200 bg-white shadow-sm" src="09-find-threads-app-credentials.webp" alt="Threads API settings with the Threads app ID, app secret, and Show button highlighted" width="2536" height="1264" />
+          </section>
+        </div>
+      </section>
+
+      <section class="mt-16 rounded-2xl bg-slate-950 p-6 text-white sm:p-8" aria-labelledby="credentials-complete-title">
+        <p class="text-sm font-bold uppercase tracking-wider text-sky-300">Step 2 complete</p>
+        <h2 id="credentials-complete-title" class="mt-2 text-2xl font-bold">Keep both credentials ready</h2>
+        <p class="mt-2 max-w-2xl leading-7 text-slate-300">You will enter the Threads app ID and app secret when you configure ThreadsBackup in Step 3.</p>
+      </section>
+
+      <section id="setup-callbacks" class="scroll-mt-6 pt-20" aria-labelledby="callbacks-title">
+        <p class="text-sm font-bold uppercase tracking-wider text-sky-700">Step 3 of 5</p>
+        <h2 id="callbacks-title" class="mt-2 text-3xl font-bold tracking-tight text-slate-950 sm:text-4xl">Set up callback URLs with a Cloudflare Quick Tunnel</h2>
+        <p class="mt-4 max-w-3xl text-lg leading-8 text-slate-600">ThreadsBackup starts a temporary HTTPS tunnel so Meta can securely return you to the local app after authorization. A Cloudflare account is not required for a Quick Tunnel.</p>
+
+        <aside class="mt-8 rounded-xl border border-slate-200 bg-white p-5" aria-labelledby="quick-tunnel-before-title">
+          <h3 id="quick-tunnel-before-title" class="font-semibold text-slate-950">Before you begin</h3>
+          <p class="mt-2 leading-7 text-slate-600">Install <strong>ThreadsBackup</strong> and <strong>cloudflared</strong>, then create a <code class="rounded bg-slate-100 px-1.5 py-0.5 text-sm text-slate-900">.env</code> file in your backup directory using the credentials from Step 2:</p>
+          <pre class="mt-4 overflow-x-auto rounded-lg bg-slate-950 p-4 text-sm leading-6 text-slate-100"><code>THREADS_APP_ID=your_threads_app_id
+THREADS_APP_SECRET=your_threads_app_secret
+PORT=8787</code></pre>
+        </aside>
+
+        <div class="mt-12 space-y-16">
+          <section aria-labelledby="start-tunnel-title">
+            <div class="flex gap-4">
+              <span class="flex size-9 shrink-0 items-center justify-center rounded-full bg-slate-950 font-bold text-white">1</span>
+              <div>
+                <h3 id="start-tunnel-title" class="text-2xl font-bold tracking-tight">Start ThreadsBackup and copy the callback URL</h3>
+                <p class="mt-2 leading-7 text-slate-600">From the directory containing your <code class="rounded bg-slate-200 px-1.5 py-0.5 text-sm text-slate-900">.env</code> file, run <code class="rounded bg-slate-200 px-1.5 py-0.5 text-sm text-slate-900">threads-backup</code>. The CLI starts the local callback server and Cloudflare Quick Tunnel automatically. Copy the complete <strong>Callback URL</strong>, including <code class="rounded bg-slate-200 px-1.5 py-0.5 text-sm text-slate-900">/oauth/callback</code>, and leave the terminal running.</p>
+              </div>
+            </div>
+            <img loading="lazy" class="mt-6 w-full rounded-xl border border-slate-200 bg-white shadow-sm" src="10-copy-quick-tunnel-callback-url.webp" alt="ThreadsBackup terminal output showing a Cloudflare Quick Tunnel callback URL and a prompt to register it in Meta" width="1248" height="180" />
+          </section>
+
+          <section aria-labelledby="register-callbacks-title">
+            <div class="flex gap-4">
+              <span class="flex size-9 shrink-0 items-center justify-center rounded-full bg-slate-950 font-bold text-white">2</span>
+              <div>
+                <h3 id="register-callbacks-title" class="text-2xl font-bold tracking-tight">Register the callback URL in Meta</h3>
+                <p class="mt-2 leading-7 text-slate-600">Return to <strong>Use cases → Access the Threads API → Customize → Settings</strong>. Paste the exact URL into <strong>Redirect Callback URLs</strong> and press <strong>Enter</strong> so it becomes a saved entry. Paste the same URL into <strong>Uninstall Callback URL</strong> and <strong>Delete Callback URL</strong>, then select <strong>Save</strong>.</p>
+              </div>
+            </div>
+            <img loading="lazy" class="mt-6 w-full rounded-xl border border-slate-200 bg-white shadow-sm" src="11-save-meta-callback-urls.webp" alt="Threads API settings with the Quick Tunnel URL entered in all three callback URL fields and Save highlighted" width="2522" height="1252" />
+          </section>
+
+          <section aria-labelledby="keep-terminal-open-title">
+            <div class="flex gap-4">
+              <span class="flex size-9 shrink-0 items-center justify-center rounded-full bg-slate-950 font-bold text-white">3</span>
+              <div>
+                <h3 id="keep-terminal-open-title" class="text-2xl font-bold tracking-tight">Leave the terminal open</h3>
+                <p class="mt-2 leading-7 text-slate-600">Do not press <strong>Enter</strong> yet. Keep ThreadsBackup and the Quick Tunnel running while you add and accept your Threads tester invitation in Step 4.</p>
+              </div>
+            </div>
+          </section>
+        </div>
+
+        <aside class="mt-12 rounded-xl border border-amber-200 bg-amber-50 p-5 text-amber-950" aria-labelledby="temporary-url-title">
+          <h3 id="temporary-url-title" class="font-semibold">Quick Tunnel URLs are temporary</h3>
+          <p class="mt-1 leading-7">Cloudflare assigns a random <code class="rounded bg-amber-100 px-1.5 py-0.5 text-sm">trycloudflare.com</code> hostname each time a new Quick Tunnel starts. If ThreadsBackup creates a different URL during a future login, replace the callback URLs in Meta before continuing.</p>
+        </aside>
+
+        <section id="fixed-tunnel" class="mt-16 scroll-mt-6 overflow-hidden rounded-2xl border border-sky-200 bg-white shadow-sm" aria-labelledby="fixed-tunnel-title">
+          <div class="bg-sky-50 px-5 py-5 sm:px-7">
+            <p class="text-xs font-bold uppercase tracking-wider text-sky-700">Optional alternative</p>
+            <h3 id="fixed-tunnel-title" class="mt-1 text-2xl font-bold text-sky-950">Create a fixed <code class="text-xl">CLOUDFLARED_TUNNEL</code></h3>
+          </div>
+          <div class="border-t border-sky-200 px-5 py-8 sm:px-7">
+            <p class="max-w-3xl leading-7 text-slate-600">Use a fixed tunnel if you want a stable callback URL that only needs to be registered in Meta once. This replaces the Quick Tunnel flow above and requires a Cloudflare account plus a domain managed by Cloudflare.</p>
+
+            <aside class="mt-6 rounded-xl border border-slate-200 bg-slate-50 p-5" aria-labelledby="fixed-before-title">
+              <h3 id="fixed-before-title" class="font-semibold text-slate-950">Before you begin</h3>
+              <p class="mt-2 leading-7 text-slate-600">Install <code class="rounded bg-slate-200 px-1.5 py-0.5 text-sm text-slate-900">cloudflared</code> on the computer that runs ThreadsBackup. Run <code class="rounded bg-slate-200 px-1.5 py-0.5 text-sm text-slate-900">cloudflared tunnel login</code> once so the CLI can find and start the tunnel by name.</p>
+            </aside>
+
+            <div class="mt-10 space-y-16">
+              <section aria-labelledby="create-fixed-title">
+                <div class="flex gap-4">
+                  <span class="flex size-9 shrink-0 items-center justify-center rounded-full bg-sky-700 font-bold text-white">1</span>
+                  <div>
+                    <h3 id="create-fixed-title" class="text-2xl font-bold tracking-tight">Create a Cloudflare Tunnel</h3>
+                    <p class="mt-2 leading-7 text-slate-600">In the Cloudflare dashboard, open <strong>Networking → Tunnels</strong>, then select <strong>Create Tunnel</strong>.</p>
+                  </div>
+                </div>
+                <img loading="lazy" class="mt-6 w-full rounded-xl border border-slate-200 bg-white shadow-sm" src="19-create-cloudflare-tunnel.webp" alt="Cloudflare Tunnels page with Tunnels and Create Tunnel highlighted" width="2238" height="1084" />
+              </section>
+
+              <section aria-labelledby="name-fixed-title">
+                <div class="flex gap-4">
+                  <span class="flex size-9 shrink-0 items-center justify-center rounded-full bg-sky-700 font-bold text-white">2</span>
+                  <div>
+                    <h3 id="name-fixed-title" class="text-2xl font-bold tracking-tight">Name the tunnel</h3>
+                    <p class="mt-2 leading-7 text-slate-600">Enter <strong>threadsbackup</strong>, or another memorable name, then select <strong>Create Tunnel</strong>. Keep the exact name—you will add it to <code class="rounded bg-slate-200 px-1.5 py-0.5 text-sm text-slate-900">.env</code> later.</p>
+                  </div>
+                </div>
+                <img loading="lazy" class="mt-6 w-full rounded-xl border border-slate-200 bg-white shadow-sm" src="20-name-fixed-tunnel.webp" alt="Cloudflare Create a Tunnel form named threadsbackup with Create Tunnel highlighted" width="1438" height="670" />
+              </section>
+
+              <section aria-labelledby="connect-fixed-title">
+                <div class="flex gap-4">
+                  <span class="flex size-9 shrink-0 items-center justify-center rounded-full bg-sky-700 font-bold text-white">3</span>
+                  <div>
+                    <h3 id="connect-fixed-title" class="text-2xl font-bold tracking-tight">Connect cloudflared</h3>
+                    <p class="mt-2 leading-7 text-slate-600">Choose your operating system and run the installation or service command provided by Cloudflare on the ThreadsBackup computer. Wait for <strong>Tunnel connected successfully</strong>, then select <strong>Continue</strong>.</p>
+                  </div>
+                </div>
+                <div class="mt-5 rounded-xl border border-amber-200 bg-amber-50 p-5 text-amber-950">
+                  <p class="font-semibold">Keep the tunnel token private</p>
+                  <p class="mt-1 leading-7">The command contains a secret token that can run your tunnel. Do not share it or save it in Git.</p>
+                </div>
+                <img loading="lazy" class="mt-6 w-full rounded-xl border border-slate-200 bg-white shadow-sm" src="21-connect-fixed-tunnel.webp" alt="Cloudflare tunnel setup showing a successful connection and Continue highlighted" width="728" height="1248" />
+              </section>
+
+              <section aria-labelledby="add-route-title">
+                <div class="flex gap-4">
+                  <span class="flex size-9 shrink-0 items-center justify-center rounded-full bg-sky-700 font-bold text-white">4</span>
+                  <div>
+                    <h3 id="add-route-title" class="text-2xl font-bold tracking-tight">Add a route</h3>
+                    <p class="mt-2 leading-7 text-slate-600">Open the tunnel’s <strong>Routes</strong> tab and select <strong>Add route</strong>.</p>
+                  </div>
+                </div>
+                <img loading="lazy" class="mt-6 w-full rounded-xl border border-slate-200 bg-white shadow-sm" src="22-add-tunnel-route.webp" alt="Cloudflare tunnel Routes tab with Add route highlighted" width="1692" height="1034" />
+              </section>
+
+              <section aria-labelledby="published-app-title">
+                <div class="flex gap-4">
+                  <span class="flex size-9 shrink-0 items-center justify-center rounded-full bg-sky-700 font-bold text-white">5</span>
+                  <div>
+                    <h3 id="published-app-title" class="text-2xl font-bold tracking-tight">Choose Published application</h3>
+                    <p class="mt-2 leading-7 text-slate-600">Select <strong>Published application</strong> so Meta can reach the local OAuth callback through a public hostname.</p>
+                  </div>
+                </div>
+                <img loading="lazy" class="mt-6 w-full rounded-xl border border-slate-200 bg-white shadow-sm" src="23-select-published-application.webp" alt="Cloudflare Add a route dialog with Published application selected" width="1412" height="968" />
+              </section>
+
+              <section aria-labelledby="configure-route-title">
+                <div class="flex gap-4">
+                  <span class="flex size-9 shrink-0 items-center justify-center rounded-full bg-sky-700 font-bold text-white">6</span>
+                  <div>
+                    <h3 id="configure-route-title" class="text-2xl font-bold tracking-tight">Configure the hostname and service</h3>
+                    <p class="mt-2 leading-7 text-slate-600">Choose a subdomain and one of your Cloudflare-managed domains. Leave <strong>Path</strong> empty. Set <strong>Service URL</strong> to <code class="rounded bg-slate-200 px-1.5 py-0.5 text-sm text-slate-900">http://127.0.0.1:8787</code>, then select <strong>Add route</strong> or <strong>Save changes</strong>.</p>
+                  </div>
+                </div>
+                <div class="mt-5 rounded-xl border border-rose-200 bg-rose-50 p-5 text-rose-950">
+                  <p class="font-semibold">Use HTTP for the local service</p>
+                  <p class="mt-1 leading-7">ThreadsBackup’s callback server uses plain HTTP on localhost. If you changed <code class="rounded bg-rose-100 px-1.5 py-0.5 text-sm">PORT</code>, use that same port here.</p>
+                </div>
+                <img loading="lazy" class="mt-6 w-full rounded-xl border border-slate-200 bg-white shadow-sm" src="24-configure-fixed-hostname.webp" alt="Cloudflare published application form with a threadsbackup hostname, http://127.0.0.1:8787 service URL, and Save changes highlighted" width="1192" height="1319" />
+              </section>
+
+              <section aria-labelledby="confirm-route-title">
+                <div class="flex gap-4">
+                  <span class="flex size-9 shrink-0 items-center justify-center rounded-full bg-sky-700 font-bold text-white">7</span>
+                  <div>
+                    <h3 id="confirm-route-title" class="text-2xl font-bold tracking-tight">Confirm the public hostname</h3>
+                    <p class="mt-2 leading-7 text-slate-600">Cloudflare creates the DNS record automatically. Copy the confirmed hostname and append <code class="rounded bg-slate-200 px-1.5 py-0.5 text-sm text-slate-900">/oauth/callback</code>. For example: <code class="break-all rounded bg-slate-200 px-1.5 py-0.5 text-sm text-slate-900">https://threadsbackup.example.com/oauth/callback</code>.</p>
+                  </div>
+                </div>
+                <img loading="lazy" class="mt-6 w-full rounded-xl border border-slate-200 bg-white shadow-sm" src="25-confirm-fixed-route.webp" alt="Cloudflare confirmation that the published application route and DNS record were created" width="1072" height="966" />
+              </section>
+
+              <section aria-labelledby="fixed-env-title">
+                <div class="flex gap-4">
+                  <span class="flex size-9 shrink-0 items-center justify-center rounded-full bg-sky-700 font-bold text-white">8</span>
+                  <div>
+                    <h3 id="fixed-env-title" class="text-2xl font-bold tracking-tight">Configure ThreadsBackup</h3>
+                    <p class="mt-2 leading-7 text-slate-600">Add the full callback URL and exact tunnel name to your <code class="rounded bg-slate-200 px-1.5 py-0.5 text-sm text-slate-900">.env</code> file. Register the same callback URL in all three Meta fields described above.</p>
+                    <pre class="mt-4 overflow-x-auto rounded-lg bg-slate-950 p-4 text-sm leading-6 text-slate-100"><code>THREADS_REDIRECT_URI=https://threadsbackup.example.com/oauth/callback
+CLOUDFLARED_TUNNEL=threadsbackup</code></pre>
+                    <p class="mt-3 leading-7 text-slate-600">When you run <code class="rounded bg-slate-200 px-1.5 py-0.5 text-sm text-slate-900">threads-backup</code>, the CLI reuses an active connector or temporarily starts the named tunnel for authorization.</p>
+                  </div>
+                </div>
+                <img loading="lazy" class="mt-6 w-full rounded-xl border border-slate-200 bg-white shadow-sm" src="26-configure-fixed-tunnel-env.webp" alt="Environment file with THREADS_REDIRECT_URI and CLOUDFLARED_TUNNEL configured" width="1166" height="246" />
+              </section>
+            </div>
+          </div>
+        </section>
+      </section>
+
+      <section class="mt-16 rounded-2xl bg-slate-950 p-6 text-white sm:p-8" aria-labelledby="callbacks-complete-title">
+        <p class="text-sm font-bold uppercase tracking-wider text-sky-300">Step 3 complete</p>
+        <h2 id="callbacks-complete-title" class="mt-2 text-2xl font-bold">Your callback URLs are saved</h2>
+        <p class="mt-2 max-w-2xl leading-7 text-slate-300">Keep the terminal open and continue to Step 4 before starting authorization.</p>
+      </section>
+
+      <section id="add-tester" class="scroll-mt-6 pt-20" aria-labelledby="tester-title">
+        <p class="text-sm font-bold uppercase tracking-wider text-sky-700">Step 4 of 5</p>
+        <h2 id="tester-title" class="mt-2 text-3xl font-bold tracking-tight text-slate-950 sm:text-4xl">Add your Threads account as an app tester</h2>
+        <p class="mt-4 max-w-3xl text-lg leading-8 text-slate-600">Your Meta app is unpublished and in development mode, so only people with an app role can use its Threads API integration. Invite the Threads account you want to back up and accept the invitation from that account.</p>
+
+        <div class="mt-12 space-y-16">
+          <section aria-labelledby="open-roles-title">
+            <div class="flex gap-4">
+              <span class="flex size-9 shrink-0 items-center justify-center rounded-full bg-slate-950 font-bold text-white">1</span>
+              <div>
+                <h3 id="open-roles-title" class="text-2xl font-bold tracking-tight">Open App roles</h3>
+                <p class="mt-2 leading-7 text-slate-600">In the Meta app dashboard, expand <strong>App roles</strong> in the sidebar, select <strong>Roles</strong>, then select <strong>Add People</strong>.</p>
+              </div>
+            </div>
+            <img loading="lazy" class="mt-6 w-full rounded-xl border border-slate-200 bg-white shadow-sm" src="12-open-app-roles.webp" alt="Meta App roles page with Roles and Add People highlighted" width="2748" height="1184" />
+          </section>
+
+          <section aria-labelledby="invite-tester-title">
+            <div class="flex gap-4">
+              <span class="flex size-9 shrink-0 items-center justify-center rounded-full bg-slate-950 font-bold text-white">2</span>
+              <div>
+                <h3 id="invite-tester-title" class="text-2xl font-bold tracking-tight">Invite the Threads account</h3>
+                <p class="mt-2 leading-7 text-slate-600">Under <strong>Additional roles for this app</strong>, choose <strong>Threads Tester</strong>. Search for the Threads username you want to back up, select the matching account, then select <strong>Add</strong>.</p>
+              </div>
+            </div>
+            <aside class="mt-5 rounded-xl border border-amber-200 bg-amber-50 p-5 text-amber-950">
+              <p class="font-semibold">The account must be eligible</p>
+              <p class="mt-1 leading-7">Meta requires the person being added to have a Facebook Developer account. Make sure you select the correct Threads profile.</p>
+            </aside>
+            <img loading="lazy" class="mt-6 w-full rounded-xl border border-slate-200 bg-white shadow-sm" src="13-add-threads-tester.webp" alt="Add people dialog with Threads Tester selected, a Threads username entered, and Add highlighted" width="1250" height="1304" />
+          </section>
+
+          <section aria-labelledby="pending-title">
+            <div class="flex gap-4">
+              <span class="flex size-9 shrink-0 items-center justify-center rounded-full bg-slate-950 font-bold text-white">3</span>
+              <div>
+                <h3 id="pending-title" class="text-2xl font-bold tracking-tight">Confirm the invitation is pending</h3>
+                <p class="mt-2 leading-7 text-slate-600">The account appears in App roles as a <strong>Threads Tester</strong> with a <strong>Pending</strong> status. The invitation is not active until it is accepted from Threads.</p>
+              </div>
+            </div>
+            <img loading="lazy" class="mt-6 w-full rounded-xl border border-slate-200 bg-white shadow-sm" src="14-tester-invitation-pending.webp" alt="Meta App roles page showing the invited Threads Tester with Pending status" width="2054" height="702" />
+          </section>
+
+          <section aria-labelledby="threads-settings-title">
+            <div class="flex gap-4">
+              <span class="flex size-9 shrink-0 items-center justify-center rounded-full bg-slate-950 font-bold text-white">4</span>
+              <div>
+                <h3 id="threads-settings-title" class="text-2xl font-bold tracking-tight">Open Threads settings</h3>
+                <p class="mt-2 leading-7 text-slate-600">Sign in to the invited account on the Threads website. Open <strong>More</strong>, then select <strong>Settings</strong>. The labels may appear in your Threads display language.</p>
+              </div>
+            </div>
+            <img loading="lazy" class="mt-6 w-full rounded-xl border border-slate-200 bg-white shadow-sm" src="15-open-threads-settings.webp" alt="Threads website menu with More and Settings highlighted in Traditional Chinese" width="920" height="700" />
+          </section>
+
+          <section aria-labelledby="website-permissions-title">
+            <div class="flex gap-4">
+              <span class="flex size-9 shrink-0 items-center justify-center rounded-full bg-slate-950 font-bold text-white">5</span>
+              <div>
+                <h3 id="website-permissions-title" class="text-2xl font-bold tracking-tight">Open Website permissions</h3>
+                <p class="mt-2 leading-7 text-slate-600">Open <strong>More settings</strong>, then select <strong>Website permissions</strong>.</p>
+              </div>
+            </div>
+            <img loading="lazy" class="mt-6 w-full rounded-xl border border-slate-200 bg-white shadow-sm" src="16-open-website-permissions.webp" alt="Threads More settings page with Website permissions highlighted in Traditional Chinese" width="1846" height="826" />
+          </section>
+
+          <section aria-labelledby="accept-invitation-title">
+            <div class="flex gap-4">
+              <span class="flex size-9 shrink-0 items-center justify-center rounded-full bg-slate-950 font-bold text-white">6</span>
+              <div>
+                <h3 id="accept-invitation-title" class="text-2xl font-bold tracking-tight">Accept the tester invitation</h3>
+                <p class="mt-2 leading-7 text-slate-600">Open the <strong>Invitations</strong> tab, find your Meta app, and select <strong>Accept</strong>. Confirm any terms shown by Threads.</p>
+              </div>
+            </div>
+            <img loading="lazy" class="mt-6 w-full rounded-xl border border-slate-200 bg-white shadow-sm" src="17-accept-tester-invitation.webp" alt="Threads Website permissions invitation for ThreadsBackup with Accept highlighted in Traditional Chinese" width="1834" height="820" />
+          </section>
+
+          <section aria-labelledby="verify-tester-title">
+            <div class="flex gap-4">
+              <span class="flex size-9 shrink-0 items-center justify-center rounded-full bg-slate-950 font-bold text-white">7</span>
+              <div>
+                <h3 id="verify-tester-title" class="text-2xl font-bold tracking-tight">Verify the tester is active</h3>
+                <p class="mt-2 leading-7 text-slate-600">Return to <strong>Meta App roles</strong> and refresh the page. The Threads Tester should remain listed without the <strong>Pending</strong> badge.</p>
+              </div>
+            </div>
+            <img loading="lazy" class="mt-6 w-full rounded-xl border border-slate-200 bg-white shadow-sm" src="18-verify-threads-tester.webp" alt="Meta App roles page showing the Threads Tester without Pending status" width="2054" height="696" />
+          </section>
+        </div>
+      </section>
+
+      <section class="mt-16 rounded-2xl bg-slate-950 p-6 text-white sm:p-8" aria-labelledby="tester-complete-title">
+        <p class="text-sm font-bold uppercase tracking-wider text-sky-300">Step 4 complete</p>
+        <h2 id="tester-complete-title" class="mt-2 text-2xl font-bold">Your Threads tester is ready</h2>
+        <p class="mt-2 max-w-2xl leading-7 text-slate-300">Continue to Step 5 to authorize that account and start the first backup.</p>
+      </section>
+
+      <section id="authorize-backup" class="scroll-mt-6 pt-20" aria-labelledby="authorize-title">
+        <p class="text-sm font-bold uppercase tracking-wider text-sky-700">Step 5 of 5</p>
+        <h2 id="authorize-title" class="mt-2 text-3xl font-bold tracking-tight text-slate-950 sm:text-4xl">Authorize your Threads account and start the backup</h2>
+        <p class="mt-4 max-w-3xl text-lg leading-8 text-slate-600">Complete the OAuth login using the tester account you accepted in Step 4. ThreadsBackup then stores the access credentials locally and begins downloading your Threads posts and media.</p>
+
+        <div class="mt-12 space-y-16">
+          <section aria-labelledby="open-oauth-title">
+            <div class="flex gap-4">
+              <span class="flex size-9 shrink-0 items-center justify-center rounded-full bg-slate-950 font-bold text-white">1</span>
+              <div>
+                <h3 id="open-oauth-title" class="text-2xl font-bold tracking-tight">Open the OAuth authorization URL</h3>
+                <p class="mt-2 leading-7 text-slate-600">For a Quick Tunnel, return to the waiting terminal and press <strong>Enter</strong>. For a fixed tunnel, run <code class="rounded bg-slate-200 px-1.5 py-0.5 text-sm text-slate-900">threads-backup</code>. When the CLI prints <strong>Open this URL</strong>, copy and open the complete URL in your browser.</p>
+              </div>
+            </div>
+            <img loading="lazy" class="mt-6 w-full rounded-xl border border-slate-200 bg-white shadow-sm" src="27-open-oauth-url.webp" alt="ThreadsBackup terminal output with the Threads OAuth authorization URL highlighted" width="1166" height="238" />
+          </section>
+
+          <section aria-labelledby="approve-access-title">
+            <div class="flex gap-4">
+              <span class="flex size-9 shrink-0 items-center justify-center rounded-full bg-slate-950 font-bold text-white">2</span>
+              <div>
+                <h3 id="approve-access-title" class="text-2xl font-bold tracking-tight">Approve access with the tester account</h3>
+                <p class="mt-2 leading-7 text-slate-600">Review the requested permission to access and display your Threads information and posts. Confirm that the displayed username is the tester account you added, then select <strong>Continue as your username</strong>.</p>
+              </div>
+            </div>
+            <img loading="lazy" class="mt-6 w-full rounded-xl border border-slate-200 bg-white shadow-sm" src="28-authorize-threads-account.webp" alt="Threads OAuth consent page requesting access to Threads information and posts with Continue highlighted" width="1218" height="1086" />
+          </section>
+
+          <section aria-labelledby="verify-backup-title">
+            <div class="flex gap-4">
+              <span class="flex size-9 shrink-0 items-center justify-center rounded-full bg-slate-950 font-bold text-white">3</span>
+              <div>
+                <h3 id="verify-backup-title" class="text-2xl font-bold tracking-tight">Verify the saved credentials and backup</h3>
+                <p class="mt-2 leading-7 text-slate-600">After Threads redirects to the callback URL, return to the terminal. ThreadsBackup saves the account token as <code class="rounded bg-slate-200 px-1.5 py-0.5 text-sm text-slate-900">.credentials/&lt;username&gt;.json</code> and starts writing posts and media to <code class="rounded bg-slate-200 px-1.5 py-0.5 text-sm text-slate-900">backups/</code>.</p>
+              </div>
+            </div>
+            <div class="mt-5 rounded-xl border border-amber-200 bg-amber-50 p-5 text-amber-950">
+              <p class="font-semibold">Keep credentials private</p>
+              <p class="mt-1 leading-7">Do not share or commit the <code class="rounded bg-amber-100 px-1.5 py-0.5 text-sm">.credentials</code> directory. It contains access tokens for your Threads account.</p>
+            </div>
+            <img loading="lazy" class="mt-6 w-full rounded-xl border border-slate-200 bg-white shadow-sm" src="29-verify-saved-credentials.webp" alt="Project file tree showing a Threads account credential JSON file inside the .credentials directory" width="528" height="198" />
+          </section>
+        </div>
+      </section>
+
+      <section class="mt-16 rounded-2xl bg-emerald-950 p-6 text-white sm:p-8" aria-labelledby="setup-complete-title">
+        <p class="text-sm font-bold uppercase tracking-wider text-emerald-300">Setup complete</p>
+        <h2 id="setup-complete-title" class="mt-2 text-2xl font-bold">ThreadsBackup is backing up your account</h2>
+        <p class="mt-2 max-w-2xl leading-7 text-emerald-100">Keep the terminal running until the backup summary appears. Future runs reuse the saved credentials and continue with an incremental backup.</p>
+      </section>
+    </main>
+
+    <footer class="border-t border-slate-200 bg-white px-5 py-8 text-center text-sm text-slate-500">
+      ThreadsBackup setup guide
+    </footer>
+  </body>
+</html>

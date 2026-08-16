@@ -3,6 +3,8 @@
 Back up your own Threads posts and attached images, videos, GIFs, thumbnails,
 and carousel media with the official Threads API.
 
+[Open the illustrated setup guide](guide/index.html).
+
 ## Requirements
 
 - Node.js 24 or newer
