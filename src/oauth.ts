@@ -212,19 +212,26 @@ async function readCredentialFile(path: string): Promise<Credentials | undefined
   }
 }
 
-async function readCredentials(root: string): Promise<Credentials | undefined> {
+async function readCredentials(root: string, account: string): Promise<Credentials | undefined> {
   if (!existsSync(root)) return undefined
   if ((await stat(root)).isFile()) return readCredentialFile(root)
-  for (const name of (await readdir(root)).filter((name) => name.endsWith('.json')).sort()) {
-    const credentials = await readCredentialFile(join(root, name))
-    if (credentials) return credentials
-  }
-  return undefined
+  return readCredentialFile(credentialPath(root, account))
 }
 
 function credentialPath(root: string, username: string): string {
-  if (!/^[A-Za-z0-9._-]+$/.test(username)) throw new Error(`Unsafe Threads username: ${username}`)
+  if (!/^[A-Za-z0-9._-]+$/.test(username) || username === '.' || username === '..') throw new Error(`Unsafe Threads username: ${username}`)
   return join(root, `${username}.json`)
+}
+
+/** Return safe account names found in the credential directory. */
+export async function credentialAccounts(cwd: string): Promise<string[]> {
+  const root = join(cwd, '.credentials')
+  if (!existsSync(root) || !(await stat(root)).isDirectory()) return []
+  return (await readdir(root, { withFileTypes: true }))
+    .filter((entry) => entry.isFile() && /^[A-Za-z0-9._-]+\.json$/.test(entry.name))
+    .map((entry) => entry.name.slice(0, -5))
+    .filter((account) => account !== '.' && account !== '..')
+    .sort()
 }
 
 async function saveCredentials(root: string, credentials: Credentials): Promise<void> {
@@ -248,7 +255,7 @@ async function saveCredentials(root: string, credentials: Credentials): Promise<
   }
 }
 
-async function authorize(config: OAuthConfig, credentialsPath: string): Promise<Credentials> {
+async function authorize(config: OAuthConfig, credentialsPath: string, account: string): Promise<Credentials> {
   const state = randomBytes(32).toString('hex')
   let cloudflared: ChildProcessWithoutNullStreams | undefined
   let resolveCode!: (code: string) => void
@@ -301,6 +308,7 @@ async function authorize(config: OAuthConfig, credentialsPath: string): Promise<
     const shortToken = await exchangeCode(config.appId, config.appSecret, redirectUri, code)
     const longToken = await exchangeLongLivedToken(config.appSecret, shortToken.access_token)
     const profile = await fetchThreadsProfile(longToken.access_token)
+    if (profile.username !== account) throw new Error(`Authenticated as ${profile.username}, expected ${account}`)
     const credentials = credentialsFromToken(longToken, profile.id, profile.username)
     await saveCredentials(credentialsPath, credentials)
     log(`Saved ${credentialPath(credentialsPath, profile.username)}.`)
@@ -314,17 +322,25 @@ async function authorize(config: OAuthConfig, credentialsPath: string): Promise<
 }
 
 /** Load, refresh, or interactively create Threads credentials. */
-export async function getCredentials(config: OAuthConfig): Promise<Credentials> {
+export async function getCredentials(config: OAuthConfig, account: string): Promise<Credentials> {
   const path = join(config.cwd, '.credentials')
-  let credentials = await readCredentials(path)
+  credentialPath(path, account)
+  let credentials = await readCredentials(path, account)
+  if (credentials?.username && credentials.username !== account) {
+    throw new Error(`Credential belongs to ${credentials.username}, expected ${account}`)
+  }
   if (credentials && !credentials.username) {
+    let profile
     try {
-      const profile = await fetchThreadsProfile(credentials.access_token)
-      credentials = { ...credentials, user_id: profile.id, username: profile.username }
-      await saveCredentials(path, credentials)
+      profile = await fetchThreadsProfile(credentials.access_token)
     } catch (error) {
       log(`Legacy credential lookup failed; starting OAuth (${error instanceof Error ? error.message : String(error)}).`)
       credentials = undefined
+    }
+    if (credentials && profile) {
+      if (profile.username !== account) throw new Error(`Credential belongs to ${profile.username}, expected ${account}`)
+      credentials = { ...credentials, user_id: profile.id, username: profile.username }
+      await saveCredentials(path, credentials)
     }
   }
   if (credentials && Date.parse(credentials.expires_at) - Date.now() > refreshBeforeMs) return credentials
@@ -341,5 +357,5 @@ export async function getCredentials(config: OAuthConfig): Promise<Credentials> 
     }
   }
 
-  return authorize(config, path)
+  return authorize(config, path, account)
 }

@@ -29,8 +29,9 @@ THREADS_APP_SECRET=your_threads_app_secret
 PORT=8787
 ```
 
-The CLI stores credentials in `.credentials/` and backups in `backups/` in that
-same directory. Do not commit any of these files.
+The CLI stores each account's credentials in `.credentials/{username}.json` and
+backups in `backups/{username}/` in that same directory. Do not commit any of
+these files.
 
 ## First login with a Quick Tunnel
 
@@ -47,7 +48,7 @@ winget install --id Cloudflare.cloudflared
 Run the CLI:
 
 ```sh
-threads-backup
+threads-backup --account your_threads_username
 ```
 
 When authorization is needed, the CLI starts a local callback server and runs:
@@ -92,10 +93,13 @@ the CLI is stopped after OAuth; an already-running connector is left alone.
 ## Usage
 
 ```sh
-# Stop when the newest existing backup is reached
+# Back up every account saved in .credentials/
 threads-backup
 
-# Skip completed posts and continue an interrupted backup
+# Back up one account, authorizing it first when needed
+threads-backup --account your_threads_username
+
+# Apply backup modes to every saved account
 threads-backup --resume
 
 # Re-fetch every post and attached media
@@ -108,8 +112,13 @@ threads-backup --help
 threads-backup --version
 ```
 
-The default mode is incremental: posts are returned newest first, and the CLI
-stops when it reaches the first post whose JSON file already exists.
+Without `--account`, accounts are read from `.credentials/*.json`, sorted by
+username, and backed up one at a time. If one account fails, the remaining
+accounts still run and the command exits with a failure status afterward. Use
+`-a username` or `--account username` to select or authorize one account.
+
+The default backup mode is incremental: posts are returned newest first, and
+the CLI stops when it reaches the first post whose JSON file already exists.
 `--resume` scans all pages, skips posts whose JSON file exists, and backs up
 missing posts left by an interrupted run.
 `--full-backup` overwrites files returned by the API but does not delete unknown
@@ -129,12 +138,13 @@ Post timestamps are converted to UTC:
 
 ```text
 backups/
-└── 2023/
-    └── 2023-07-06-04-35-02-17977704596464643/
-        ├── 17977704596464643.json
-        ├── 17977704596464643-media.jpg
-        ├── 17977704596464643-thumbnail.jpg
-        └── 17977704596464644-media.mp4
+└── your_threads_username/
+    └── 2023/
+        └── 2023-07-06-04-35-02-17977704596464643/
+            ├── 17977704596464643.json
+            ├── 17977704596464643-media.jpg
+            ├── 17977704596464643-thumbnail.jpg
+            └── 17977704596464644-media.mp4
 ```
 
 Each JSON file contains:
@@ -148,6 +158,12 @@ Each JSON file contains:
 
 Media attached directly to the post and its carousel children is downloaded.
 Media belonging to quoted or reposted third-party posts is not downloaded.
+
+## Breaking change
+
+Backups now use `backups/{username}/{year}/` instead of `backups/{year}/`.
+Existing backup folders are not migrated or checked, so the first account-scoped
+run can download those posts again. The old folders are left untouched.
 
 ## Security and API access
 

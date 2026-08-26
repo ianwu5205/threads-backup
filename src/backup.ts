@@ -15,12 +15,19 @@ function safeId(id: string): string {
   return id
 }
 
+function safeAccount(account: string): string {
+  if (!/^[A-Za-z0-9._-]+$/.test(account) || account === '.' || account === '..') {
+    throw new Error(`Unsafe Threads username: ${account}`)
+  }
+  return account
+}
+
 function pad(value: number): string {
   return String(value).padStart(2, '0')
 }
 
 /** Return the requested output directory for one post. */
-export function postDirectory(cwd: string, post: ThreadsPost, backupFolder = 'backups'): string {
+export function postDirectory(cwd: string, post: ThreadsPost, account: string, backupFolder = 'backups'): string {
   const date = new Date(String(post.timestamp ?? ''))
   if (Number.isNaN(date.valueOf())) throw new Error(`Post ${post.id} has an invalid timestamp`)
   const stamp = [
@@ -31,11 +38,11 @@ export function postDirectory(cwd: string, post: ThreadsPost, backupFolder = 'ba
     pad(date.getUTCMinutes()),
     pad(date.getUTCSeconds()),
   ].join('-')
-  return join(resolve(cwd, backupFolder), String(date.getUTCFullYear()), `${stamp}-${safeId(post.id)}`)
+  return join(resolve(cwd, backupFolder), safeAccount(account), String(date.getUTCFullYear()), `${stamp}-${safeId(post.id)}`)
 }
 
-function jsonPath(cwd: string, post: ThreadsPost, backupFolder: string): string {
-  return join(postDirectory(cwd, post, backupFolder), `${safeId(post.id)}.json`)
+function jsonPath(cwd: string, post: ThreadsPost, account: string, backupFolder: string): string {
+  return join(postDirectory(cwd, post, account, backupFolder), `${safeId(post.id)}.json`)
 }
 
 async function exists(path: string): Promise<boolean> {
@@ -93,9 +100,9 @@ function mediaExtension(url: string, contentType: string | null): string {
   return mimeExtensions[contentType?.split(';', 1)[0].trim().toLowerCase() ?? ''] ?? '.bin'
 }
 
-async function savePost(cwd: string, post: ThreadsPost, accessToken: string, backupFolder: string): Promise<void> {
+async function savePost(cwd: string, post: ThreadsPost, accessToken: string, account: string, backupFolder: string): Promise<void> {
   const enriched = await withChildMedia(post, accessToken)
-  const directory = postDirectory(cwd, enriched, backupFolder)
+  const directory = postDirectory(cwd, enriched, account, backupFolder)
   const datetime = new Date(String(enriched.timestamp)).toISOString()
   for (const media of mediaReferences(enriched)) {
     const response = await fetch(media.url)
@@ -104,20 +111,20 @@ async function savePost(cwd: string, post: ThreadsPost, accessToken: string, bac
     debug(`Download ${datetime} image in ${path}.`)
     await atomicDownload(path, response)
   }
-  const path = jsonPath(cwd, enriched, backupFolder)
+  const path = jsonPath(cwd, enriched, account, backupFolder)
   debug(`Download ${datetime} post in ${path}.`)
   await atomicWrite(path, `${JSON.stringify(enriched, null, 2)}\n`)
 }
 
 /** Back up new posts, all posts, or resume past existing posts. */
-export async function backupPosts(cwd: string, accessToken: string, fullBackup = false, resume = false, backupFolder = 'backups'): Promise<BackupSummary> {
+export async function backupPosts(cwd: string, accessToken: string, account: string, fullBackup = false, resume = false, backupFolder = 'backups'): Promise<BackupSummary> {
   const summary: BackupSummary = { saved: 0, failed: 0, stoppedAtExisting: false }
   const loggedDays = new Set<string>()
   let nextUrl: string | undefined
   do {
     const page = await fetchThreadsPage(accessToken, nextUrl)
     for (const post of page.data ?? []) {
-      if (!fullBackup && await exists(jsonPath(cwd, post, backupFolder))) {
+      if (!fullBackup && await exists(jsonPath(cwd, post, account, backupFolder))) {
         if (resume) continue
         summary.stoppedAtExisting = true
         return summary
@@ -128,7 +135,7 @@ export async function backupPosts(cwd: string, accessToken: string, fullBackup =
           console.log(`Download ${day} post.`)
           loggedDays.add(day)
         }
-        await savePost(cwd, post, accessToken, backupFolder)
+        await savePost(cwd, post, accessToken, account, backupFolder)
         summary.saved++
       } catch (error) {
         summary.failed++
