@@ -5,9 +5,9 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { test } from 'node:test'
 
-function runCli(cwd: string, setup = ''): Promise<{ code: number | null, stdout: string, stderr: string }> {
+function runCli(cwd: string, setup = '', args: string[] = []): Promise<{ code: number | null, stdout: string, stderr: string }> {
   const source = new URL('../src/cli.ts', import.meta.url).href
-  const child = spawn(process.execPath, ['--experimental-strip-types', '--input-type=module', '--eval', `${setup}\nawait import(${JSON.stringify(source)})`], {
+  const child = spawn(process.execPath, ['--experimental-strip-types', '--input-type=module', '--eval', `${setup}\nprocess.argv = ${JSON.stringify(['node', 'threads-backup', ...args])}\nawait import(${JSON.stringify(source)})`], {
     cwd,
     env: { ...process.env, NODE_NO_WARNINGS: '1', THREADS_APP_ID: 'app', THREADS_APP_SECRET: 'secret' },
   })
@@ -24,6 +24,29 @@ test('CLI without an account requires saved credentials', async () => {
     const result = await runCli(cwd)
     assert.equal(result.code, 1)
     assert.match(result.stderr, /Run threads-backup --account <username> first/)
+  } finally {
+    await rm(cwd, { recursive: true })
+  }
+})
+
+test('CLI --auth requires an account', async () => {
+  const cwd = await mkdtemp(join(tmpdir(), 'threads-cli-'))
+  try {
+    const result = await runCli(cwd, '', ['--auth'])
+    assert.equal(result.code, 1)
+    assert.match(result.stderr, /--auth requires --account/)
+  } finally {
+    await rm(cwd, { recursive: true })
+  }
+})
+
+test('CLI help documents --auth', async () => {
+  const cwd = await mkdtemp(join(tmpdir(), 'threads-cli-'))
+  try {
+    const result = await runCli(cwd, '', ['--help'])
+    assert.equal(result.code, 0)
+    assert.match(result.stdout, /--account <username> --auth/)
+    assert.match(result.stdout, /overwrite \.credentials\/<username>\.json, then back up/)
   } finally {
     await rm(cwd, { recursive: true })
   }

@@ -4,15 +4,20 @@ import { loadEnvFile } from 'node:process'
 import { backupPosts } from './backup.ts'
 import { credentialAccounts, getCredentials } from './oauth.ts'
 
-const help = `threads-backup - back up your Threads posts and media
+const help = `threads-backup - back up your Threads posts, replies, and media
 
 Usage:
   threads-backup [-a <username>] [--resume | --full-backup] [--backup-folder <path>]
+  threads-backup --account <username> --auth
   threads-backup --help
   threads-backup --version
 
+Replies on your own posts are saved in each post's JSON file. An existing login
+only has threads_basic until you log in again with --account <username> --auth.
+
 Options:
   -a, --account <username>  Back up one account (default: all saved accounts)
+  --auth         Log in again, overwrite .credentials/<username>.json, then back up
   --resume       Skip completed posts and continue through all pages
   --full-backup  Re-fetch every post and media file
   --backup-folder <path>  Save backups in this folder (default: backups)
@@ -49,8 +54,10 @@ async function main(): Promise<void> {
   const account = accountIndex === -1 ? undefined : args[accountIndex + 1]
   if (accountIndex !== -1 && (!account || account.startsWith('-'))) throw new Error('--account requires a username')
   if (account && (!/^[A-Za-z0-9._-]+$/.test(account) || account === '.' || account === '..')) throw new Error(`Unsafe Threads username: ${account}`)
+  const auth = args.includes('--auth')
+  if (auth && !account) throw new Error('--auth requires --account')
   const values = new Set([folderIndex + 1, accountIndex + 1].filter((index) => index > 0))
-  const unknown = args.filter((argument, index) => !['-a', '--account', '--resume', '--full-backup', '--backup-folder'].includes(argument) && !values.has(index))
+  const unknown = args.filter((argument, index) => !['-a', '--account', '--auth', '--resume', '--full-backup', '--backup-folder'].includes(argument) && !values.has(index))
   if (unknown.length) throw new Error(`Unknown option: ${unknown[0]}`)
   if (args.includes('--resume') && args.includes('--full-backup')) throw new Error('--resume and --full-backup cannot be used together')
 
@@ -72,7 +79,7 @@ async function main(): Promise<void> {
   for (const selectedAccount of accounts) {
     console.log(`Start process ${selectedAccount} posts.`)
     try {
-      const credentials = await getCredentials(config, selectedAccount)
+      const credentials = await getCredentials(config, selectedAccount, auth)
       const summary = await backupPosts(cwd, credentials.access_token, selectedAccount, args.includes('--full-backup'), args.includes('--resume'), backupFolder)
       console.log(`${selectedAccount}: Saved ${summary.saved} posts with ${summary.failed} failures.`)
       if (summary.failed) process.exitCode = 1

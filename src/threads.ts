@@ -25,13 +25,15 @@ export type ThreadsPost = {
   media_url?: string
   gif_url?: string
   thumbnail_url?: string
+  has_replies?: boolean
+  replies?: ThreadsPost[]
   children?: { data?: ThreadsPost[] }
   [key: string]: unknown
 }
 
 export type ThreadsPage = {
   data?: ThreadsPost[]
-  paging?: { next?: string }
+  paging?: { next?: string, cursors?: { before?: string, after?: string } }
 }
 
 const mediaFields = 'id,media_type,media_url,gif_url,thumbnail_url'
@@ -55,6 +57,27 @@ const postFields = [
   'topic_tag',
   'is_verified',
   'profile_picture_url',
+  'has_replies',
+].join(',')
+
+const replyFields = [
+  'id',
+  'text',
+  'username',
+  'permalink',
+  'timestamp',
+  'media_product_type',
+  'media_type',
+  'media_url',
+  'shortcode',
+  'thumbnail_url',
+  'children',
+  'has_replies',
+  'root_post',
+  'replied_to',
+  'is_reply',
+  'is_reply_owned_by_me',
+  'hide_status',
 ].join(',')
 
 async function graphJson<T>(url: string | URL, init: RequestInit = {}): Promise<T> {
@@ -68,7 +91,7 @@ export function authUrl(appId: string, redirectUri: string, state: string): stri
   const url = new URL('https://www.threads.net/oauth/authorize')
   url.searchParams.set('client_id', appId)
   url.searchParams.set('redirect_uri', redirectUri)
-  url.searchParams.set('scope', 'threads_basic')
+  url.searchParams.set('scope', 'threads_basic,threads_read_replies')
   url.searchParams.set('response_type', 'code')
   url.searchParams.set('state', state)
   return url.toString()
@@ -135,6 +158,39 @@ export function fetchThreadsPage(accessToken: string, nextUrl?: string): Promise
     url.searchParams.set('limit', '100')
   }
   return graphJson(url, { headers: { authorization: `Bearer ${accessToken}` } })
+}
+
+/** Fetch every reply on a post, oldest first. Nested replies are included flat. */
+export async function fetchThreadReplies(id: string, accessToken: string): Promise<ThreadsPost[]> {
+  const replies: ThreadsPost[] = []
+  const seenCursors = new Set<string>()
+  let nextUrl: string | undefined
+  let after: string | undefined
+  do {
+    const url = nextUrl
+      ? new URL(nextUrl)
+      : new URL(`${graphBaseUrl}/v1.0/${encodeURIComponent(id)}/conversation`)
+    url.searchParams.delete('access_token')
+    if (!nextUrl) {
+      url.searchParams.set('fields', replyFields)
+      url.searchParams.set('limit', '100')
+      url.searchParams.set('reverse', 'false')
+      if (after) url.searchParams.set('after', after)
+    }
+    const page = await graphJson<ThreadsPage>(url, { headers: { authorization: `Bearer ${accessToken}` } })
+    replies.push(...page.data ?? [])
+    nextUrl = page.paging?.next
+    const cursor = page.paging?.cursors?.after
+    if (nextUrl) {
+      after = undefined
+    } else if (cursor && !seenCursors.has(cursor) && (page.data?.length ?? 0) > 0) {
+      seenCursors.add(cursor)
+      after = cursor
+    } else {
+      after = undefined
+    }
+  } while (nextUrl || after)
+  return replies
 }
 
 /** Fetch downloadable fields for one carousel child. */

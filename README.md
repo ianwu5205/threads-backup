@@ -1,7 +1,7 @@
 # threads-backup
 
-Back up your own Threads posts and attached images, videos, GIFs, thumbnails,
-and carousel media with the official Threads API.
+Back up your own Threads posts, the replies on those posts, and attached images,
+videos, GIFs, thumbnails, and carousel media with the official Threads API.
 
 [Open the illustrated setup guide](https://ianwu5205.github.io/threads-backup/guide/).
 
@@ -99,6 +99,9 @@ threads-backup
 # Back up one account, authorizing it first when needed
 threads-backup --account your_threads_username
 
+# Log in again, overwrite .credentials/{username}.json, then back up
+threads-backup --account your_threads_username --auth
+
 # Apply backup modes to every saved account
 threads-backup --resume
 
@@ -116,13 +119,23 @@ Without `--account`, accounts are read from `.credentials/*.json`, sorted by
 username, and backed up one at a time. If one account fails, the remaining
 accounts still run and the command exits with a failure status afterward. Use
 `-a username` or `--account username` to select or authorize one account.
+`--account username --auth` always runs login, overwrites
+`.credentials/{username}.json`, and then backs up that account.
 
 The default backup mode is incremental: posts are returned newest first, and
 the CLI stops when it reaches the first post whose JSON file already exists.
-`--resume` scans all pages, skips posts whose JSON file exists, and backs up
-missing posts left by an interrupted run.
-`--full-backup` overwrites files returned by the API but does not delete unknown
-files from an existing backup directory.
+New posts include their replies. `--resume` scans all pages, skips post media
+that is already on disk, backs up missing posts left by an interrupted run, and
+refreshes replies on every visited post. `--full-backup` overwrites files
+returned by the API, including replies, but does not delete unknown files from
+an existing backup directory.
+
+Reading replies requires `threads_read_replies`. Tokens saved before that
+permission was requested cannot read replies. Run
+`threads-backup --account your_threads_username --auth` to log in again and
+overwrite `.credentials/{username}.json`. Enable `threads_read_replies` on the
+Meta app as well. In development mode, an app tester can grant it without App
+Review.
 
 ## Debug logging
 
@@ -144,20 +157,37 @@ backups/
             ├── 17977704596464643.json
             ├── 17977704596464643-media.jpg
             ├── 17977704596464643-thumbnail.jpg
-            └── 17977704596464644-media.mp4
+            ├── 17977704596464644-media.mp4
+            └── 18000000000000001-media.jpg
 ```
 
-Each JSON file contains:
+Each JSON file contains the post and a `replies` array. Nested replies are
+stored flat, with `replied_to` and `root_post` identifying their place in the
+thread:
 
 ```json
 {
   "id": "17977704596464643",
-  "timestamp": "2023-07-06T04:35:02+0000"
+  "timestamp": "2023-07-06T04:35:02+0000",
+  "has_replies": true,
+  "replies": [
+    {
+      "id": "18000000000000001",
+      "text": "reply",
+      "username": "someone",
+      "timestamp": "2023-07-06T05:00:00+0000",
+      "is_reply": true,
+      "replied_to": { "id": "17977704596464643" },
+      "root_post": { "id": "17977704596464643" }
+    }
+  ]
 }
 ```
 
-Media attached directly to the post and its carousel children is downloaded.
-Media belonging to quoted or reposted third-party posts is not downloaded.
+Media attached to the post, its carousel children, and its replies is
+downloaded. Media belonging to quoted or reposted third-party posts is not
+downloaded. Posts saved before replies were archived pick up the `replies`
+array on the next `--resume` or `--full-backup` run.
 
 ## Breaking change
 
@@ -175,10 +205,10 @@ run can download those posts again. The old folders are left untouched.
 - Quick Tunnels expose the callback server publicly only during authorization;
   the CLI stops the child process afterward.
 
-`threads_basic` is the only requested permission. App testers can use the app
-while it is in development mode. Allowing arbitrary users to authenticate can
-require switching the Meta app live and completing the applicable Meta App
-Review and data-handling requirements.
+`threads_basic` and `threads_read_replies` are the requested permissions. App
+testers can use the app while it is in development mode. Allowing arbitrary
+users to authenticate can require switching the Meta app live and completing
+the applicable Meta App Review and data-handling requirements.
 
 ## Development
 

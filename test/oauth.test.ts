@@ -85,6 +85,37 @@ test('credentialAccounts sorts safe filenames and getCredentials selects the req
   }
 })
 
+test('getCredentials with auth ignores a saved login and does not replace it before OAuth succeeds', async () => {
+  const cwd = await mkdtemp(join(tmpdir(), 'threads-credentials-'))
+  const root = join(cwd, '.credentials')
+  await mkdir(root)
+  const path = join(root, 'zeta.json')
+  const saved = JSON.stringify({
+    access_token: 'zeta-token',
+    token_type: 'bearer',
+    user_id: 'zeta-id',
+    username: 'zeta',
+    obtained_at: '2026-08-01T00:00:00.000Z',
+    expires_at: '2099-01-01T00:00:00.000Z',
+  })
+  await writeFile(path, saved)
+  try {
+    await assert.rejects(
+      getCredentials({
+        appId: 'app',
+        appSecret: 'secret',
+        port: 0,
+        redirectUri: 'http://backup.example.com/oauth/callback',
+        cwd,
+      }, 'zeta', true),
+      /HTTPS/,
+    )
+    assert.equal(await readFile(path, 'utf8'), saved)
+  } finally {
+    await rm(cwd, { recursive: true })
+  }
+})
+
 test('getCredentials rejects a credential saved under the wrong account', async () => {
   const cwd = await mkdtemp(join(tmpdir(), 'threads-credentials-'))
   const root = join(cwd, '.credentials')

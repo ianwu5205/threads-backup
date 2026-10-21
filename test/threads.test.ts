@@ -5,17 +5,18 @@ import {
   credentialsFromToken,
   exchangeLongLivedToken,
   fetchThreadMedia,
+  fetchThreadReplies,
   fetchThreadsProfile,
   fetchThreadsPage,
   refreshLongLivedToken,
 } from '../src/threads.ts'
 
-test('authUrl requests threads_basic and protects the callback with state', () => {
+test('authUrl requests threads_basic and threads_read_replies and protects the callback with state', () => {
   const url = new URL(authUrl('app123', 'https://example.com/oauth/callback', 'state123'))
   assert.equal(url.origin, 'https://www.threads.net')
   assert.equal(url.searchParams.get('client_id'), 'app123')
   assert.equal(url.searchParams.get('redirect_uri'), 'https://example.com/oauth/callback')
-  assert.equal(url.searchParams.get('scope'), 'threads_basic')
+  assert.equal(url.searchParams.get('scope'), 'threads_basic,threads_read_replies')
   assert.equal(url.searchParams.get('response_type'), 'code')
   assert.equal(url.searchParams.get('state'), 'state123')
 })
@@ -50,7 +51,47 @@ test('Threads requests use bearer auth without putting the token in the URL', as
   assert.equal(requests.length, 3)
   assert.ok(requests.every(({ url }) => !url.includes('secret-token')))
   assert.ok(requests.every(({ authorization }) => authorization === 'Bearer secret-token'))
-  assert.ok(!requests[0].url.includes('has_replies'))
+  assert.ok(requests[0].url.includes('has_replies'))
+})
+
+test('fetchThreadReplies follows next URLs and after cursors without exposing the token', async () => {
+  const requests: Array<{ url: string, authorization: string | null }> = []
+  const originalFetch = globalThis.fetch
+  globalThis.fetch = async (input, init) => {
+    const headers = new Headers(init?.headers)
+    const url = String(input)
+    requests.push({ url, authorization: headers.get('authorization') })
+    if (requests.length === 1) {
+      return Response.json({
+        data: [{ id: 'reply1', text: 'first' }],
+        paging: { next: 'https://graph.threads.net/v1.0/post1/conversation?after=n1&access_token=secret-token' },
+      })
+    }
+    if (requests.length === 2) {
+      return Response.json({
+        data: [{ id: 'reply2', text: 'second' }],
+        paging: { cursors: { after: 'c2' } },
+      })
+    }
+    return Response.json({ data: [] })
+  }
+  try {
+    assert.deepEqual(await fetchThreadReplies('post1', 'secret-token'), [
+      { id: 'reply1', text: 'first' },
+      { id: 'reply2', text: 'second' },
+    ])
+  } finally {
+    globalThis.fetch = originalFetch
+  }
+  assert.equal(requests.length, 3)
+  assert.ok(requests.every(({ url, authorization }) => authorization === 'Bearer secret-token' && !url.includes('secret-token')))
+  const first = new URL(requests[0].url)
+  assert.equal(first.pathname, '/v1.0/post1/conversation')
+  assert.equal(first.searchParams.get('reverse'), 'false')
+  assert.equal(first.searchParams.get('limit'), '100')
+  assert.match(first.searchParams.get('fields') ?? '', /is_reply_owned_by_me/)
+  assert.equal(new URL(requests[1].url).searchParams.get('after'), 'n1')
+  assert.equal(new URL(requests[2].url).searchParams.get('after'), 'c2')
 })
 
 test('long-lived token exchange and refresh use the required query parameter', async () => {

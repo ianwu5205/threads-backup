@@ -15,7 +15,7 @@ test('postDirectory uses the UTC post timestamp and requested layout', () => {
   assert.throws(() => postDirectory('/work', post, '..'), /Unsafe Threads username/)
 })
 
-test('mediaReferences includes children and deduplicates URLs', () => {
+test('mediaReferences includes reply media and deduplicates URLs', () => {
   assert.deepEqual(mediaReferences({
     id: 'post1',
     media_url: 'https://cdn.example/a.jpg',
@@ -24,6 +24,18 @@ test('mediaReferences includes children and deduplicates URLs', () => {
   }), [
     { id: 'post1', kind: 'media', url: 'https://cdn.example/a.jpg' },
     { id: 'child1', kind: 'gif', url: 'https://cdn.example/b.gif' },
+  ])
+  assert.deepEqual(mediaReferences({
+    id: 'post1',
+    replies: [{
+      id: 'reply1',
+      media_url: 'https://cdn.example/r.jpg',
+      quoted_post: { id: 'other', media_url: 'https://cdn.example/quoted.jpg' },
+      children: { data: [{ id: 'reply-child', thumbnail_url: 'https://cdn.example/t.jpg' }] },
+    }],
+  }), [
+    { id: 'reply1', kind: 'media', url: 'https://cdn.example/r.jpg' },
+    { id: 'reply-child', kind: 'thumbnail', url: 'https://cdn.example/t.jpg' },
   ])
 })
 
@@ -133,8 +145,104 @@ test('carousel media uses the child ID and Content-Type extension', async () => 
     assert.equal(await readFile(join(postDirectory(cwd, post, 'tester'), 'child1-media.jpg'), 'utf8'), 'image-bytes')
     const saved = JSON.parse(await readFile(join(postDirectory(cwd, post, 'tester'), 'carousel.json'), 'utf8')) as {
       children: { data: Array<{ media_url: string }> }
+      replies: unknown[]
     }
     assert.equal(saved.children.data[0].media_url, 'https://cdn.example/no-extension')
+    assert.deepEqual(saved.replies, [])
+  } finally {
+    globalThis.fetch = originalFetch
+    await rm(cwd, { recursive: true })
+  }
+})
+
+test('posts with replies store the conversation and download reply media', async () => {
+  const cwd = await mkdtemp(join(tmpdir(), 'threads-backup-'))
+  const post = {
+    id: 'post1',
+    timestamp: '2026-08-07T01:02:03Z',
+    has_replies: true,
+    media_url: 'https://cdn.example/post.jpg',
+  }
+  const quiet = { id: 'quiet', timestamp: '2026-08-07T02:02:03Z', has_replies: false }
+  const originalFetch = globalThis.fetch
+  globalThis.fetch = async (input) => {
+    const url = String(input)
+    if (url.includes('/me/threads')) return Response.json({ data: [post, quiet] })
+    if (url.includes('/conversation')) {
+      return Response.json({ data: [{ id: 'reply1', text: 'hello', media_url: 'https://cdn.example/reply.jpg' }] })
+    }
+    if (url === 'https://cdn.example/post.jpg') return new Response('post-bytes', { headers: { 'content-type': 'image/jpeg' } })
+    if (url === 'https://cdn.example/reply.jpg') return new Response('reply-bytes', { headers: { 'content-type': 'image/jpeg' } })
+    throw new Error(`Unexpected URL: ${url}`)
+  }
+  try {
+    assert.deepEqual(await backupPosts(cwd, 'token', 'tester'), { saved: 2, failed: 0, stoppedAtExisting: false })
+    const directory = postDirectory(cwd, post, 'tester')
+    assert.equal(await readFile(join(directory, 'post1-media.jpg'), 'utf8'), 'post-bytes')
+    assert.equal(await readFile(join(directory, 'reply1-media.jpg'), 'utf8'), 'reply-bytes')
+    const saved = JSON.parse(await readFile(join(directory, 'post1.json'), 'utf8')) as { replies: Array<{ text: string }> }
+    assert.equal(saved.replies[0].text, 'hello')
+    const skipped = JSON.parse(await readFile(join(postDirectory(cwd, quiet, 'tester'), 'quiet.json'), 'utf8')) as { replies: unknown[] }
+    assert.deepEqual(skipped.replies, [])
+  } finally {
+    globalThis.fetch = originalFetch
+    await rm(cwd, { recursive: true })
+  }
+})
+
+test('resume refreshes replies without downloading existing post media again', async () => {
+  const cwd = await mkdtemp(join(tmpdir(), 'threads-backup-'))
+  const post = {
+    id: 'post1',
+    timestamp: '2026-08-07T01:02:03Z',
+    has_replies: true,
+    text: 'original',
+    media_url: 'https://cdn.example/post.jpg',
+  }
+  const directory = postDirectory(cwd, post, 'tester')
+  await mkdir(directory, { recursive: true })
+  await writeFile(join(directory, 'post1.json'), `${JSON.stringify({ id: 'post1', text: 'original' })}\n`)
+  const fetched: string[] = []
+  const originalFetch = globalThis.fetch
+  globalThis.fetch = async (input) => {
+    const url = String(input)
+    fetched.push(url)
+    if (url.includes('/me/threads')) return Response.json({ data: [post] })
+    if (url.includes('/conversation')) return Response.json({ data: [{ id: 'reply1', text: 'hello', media_url: 'https://cdn.example/reply.jpg' }] })
+    if (url === 'https://cdn.example/reply.jpg') return new Response('reply-bytes', { headers: { 'content-type': 'image/jpeg' } })
+    throw new Error(`Unexpected URL: ${url}`)
+  }
+  try {
+    assert.deepEqual(await backupPosts(cwd, 'token', 'tester', false, true), { saved: 0, failed: 0, stoppedAtExisting: false })
+    assert.equal(fetched.some((url) => url.includes('post.jpg')), false)
+    assert.equal(await readFile(join(directory, 'reply1-media.jpg'), 'utf8'), 'reply-bytes')
+    const saved = JSON.parse(await readFile(join(directory, 'post1.json'), 'utf8')) as { text: string, replies: Array<{ text: string }> }
+    assert.equal(saved.text, 'original')
+    assert.equal(saved.replies[0].text, 'hello')
+
+    const before = fetched.length
+    assert.deepEqual(await backupPosts(cwd, 'token', 'tester', false, true), { saved: 0, failed: 0, stoppedAtExisting: false })
+    assert.equal(fetched.slice(before).some((url) => url.includes('reply.jpg')), false)
+  } finally {
+    globalThis.fetch = originalFetch
+    await rm(cwd, { recursive: true })
+  }
+})
+
+test('a missing reply permission stops the account before writing JSON', async () => {
+  const cwd = await mkdtemp(join(tmpdir(), 'threads-backup-'))
+  const post = { id: 'post1', timestamp: '2026-08-07T01:02:03Z', has_replies: true }
+  const originalFetch = globalThis.fetch
+  globalThis.fetch = async (input) => {
+    const url = String(input)
+    if (url.includes('/me/threads')) return Response.json({ data: [post] })
+    return new Response(JSON.stringify({
+      error: { message: '(#10) Application does not have permission for this action', type: 'OAuthException', code: 10 },
+    }), { status: 400 })
+  }
+  try {
+    await assert.rejects(backupPosts(cwd, 'token', 'tester'), /Delete \.credentials\/tester\.json and log in again/)
+    await assert.rejects(readFile(join(postDirectory(cwd, post, 'tester'), 'post1.json')), { code: 'ENOENT' })
   } finally {
     globalThis.fetch = originalFetch
     await rm(cwd, { recursive: true })

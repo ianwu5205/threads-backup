@@ -97,7 +97,9 @@ async function runCloudflared(args: string[]): Promise<string> {
 
 async function waitForCallback(redirectUri: string, child?: ChildProcessWithoutNullStreams): Promise<void> {
   const healthUrl = new URL('/health', redirectUri)
+  console.log(`Check tunnel ${healthUrl.origin}.`)
   for (let attempt = 0; attempt < 30; attempt++) {
+    if (attempt > 0 && attempt % 5 === 0) console.log(`Still checking tunnel ${healthUrl.origin} (${attempt}/30).`)
     if (child && child.exitCode !== null) throw new Error(`cloudflared exited before ${healthUrl.origin} became reachable`)
     try {
       const response = await fetch(healthUrl, { signal: AbortSignal.timeout(2_000) })
@@ -111,13 +113,17 @@ async function waitForCallback(redirectUri: string, child?: ChildProcessWithoutN
 }
 
 async function ensureFixedTunnel(name: string, redirectUri: string, port: number): Promise<ChildProcessWithoutNullStreams | undefined> {
+  console.log(`Check Cloudflare tunnel ${name}.`)
   const status = tunnelStatus(await runCloudflared(['tunnel', 'list', '--output', 'json']), name)
   if (!status) throw new Error(`Cloudflare tunnel not found: ${name}`)
   if (status.connections?.length) {
+    console.log(`Use active tunnel ${name}.`)
     await waitForCallback(redirectUri)
     log(`Using active tunnel ${name}.`)
     return undefined
   }
+
+  console.log(`Start Cloudflare tunnel ${name}.`)
 
   const tokenPath = join(tmpdir(), `threads-backup-${randomUUID()}.token`)
   let child: ChildProcessWithoutNullStreams | undefined
@@ -151,6 +157,7 @@ async function ensureFixedTunnel(name: string, redirectUri: string, port: number
 }
 
 async function startQuickTunnel(port: number): Promise<{ process: ChildProcessWithoutNullStreams, redirectUri: string }> {
+  console.log('Start Quick Tunnel.')
   const child = spawn('cloudflared', [
     'tunnel',
     '--url', `http://127.0.0.1:${port}`,
@@ -290,6 +297,7 @@ async function authorize(config: OAuthConfig, credentialsPath: string, account: 
   process.once('SIGTERM', onSignal)
 
   try {
+    console.log(`Start local callback on port ${config.port}.`)
     await listen(server, config.port)
     let redirectUri: string
     if (config.redirectUri) {
@@ -305,12 +313,15 @@ async function authorize(config: OAuthConfig, credentialsPath: string, account: 
 
     console.log(`\nOpen this URL:\n${authUrl(config.appId, redirectUri, state)}\n`)
     const timeout = setTimeout(() => rejectCode(new Error('OAuth callback timed out after 10 minutes')), 600_000)
+    console.log('Wait for Threads login in the browser.')
     const code = await codePromise.finally(() => clearTimeout(timeout))
+    console.log('Exchange Threads login.')
     const shortToken = await exchangeCode(config.appId, config.appSecret, redirectUri, code)
     const longToken = await exchangeLongLivedToken(config.appSecret, shortToken.access_token)
     const profile = await fetchThreadsProfile(longToken.access_token)
     if (profile.username !== account) throw new Error(`Authenticated as ${profile.username}, expected ${account}`)
     const credentials = credentialsFromToken(longToken, profile.id, profile.username)
+    console.log(`Save login for ${account}.`)
     await saveCredentials(credentialsPath, credentials)
     log(`Saved ${credentialPath(credentialsPath, profile.username)}.`)
     return credentials
@@ -322,15 +333,20 @@ async function authorize(config: OAuthConfig, credentialsPath: string, account: 
   }
 }
 
-/** Load, refresh, or interactively create Threads credentials. */
-export async function getCredentials(config: OAuthConfig, account: string): Promise<Credentials> {
+/** Load, refresh, or interactively create Threads credentials. `auth` always starts login and overwrites the saved file. */
+export async function getCredentials(config: OAuthConfig, account: string, auth = false): Promise<Credentials> {
   const path = join(config.cwd, '.credentials')
   credentialPath(path, account)
+  if (auth) {
+    console.log(`Start login for ${account}.`)
+    return authorize(config, path, account)
+  }
   let credentials = await readCredentials(path, account)
   if (credentials?.username && credentials.username !== account) {
     throw new Error(`Credential belongs to ${credentials.username}, expected ${account}`)
   }
   if (credentials && !credentials.username) {
+    console.log(`Check Threads profile for ${account}.`)
     let profile
     try {
       profile = await fetchThreadsProfile(credentials.access_token)
@@ -344,19 +360,27 @@ export async function getCredentials(config: OAuthConfig, account: string): Prom
       await saveCredentials(path, credentials)
     }
   }
-  if (credentials && Date.parse(credentials.expires_at) - Date.now() > refreshBeforeMs) return credentials
+  if (credentials && Date.parse(credentials.expires_at) - Date.now() > refreshBeforeMs) {
+    console.log(`Use saved login for ${account}.`)
+    return credentials
+  }
 
   // Expiring or already expired: try refresh first, then full OAuth re-auth.
   if (credentials) {
+    console.log(`Refresh login for ${account}.`)
     try {
       const token = await refreshLongLivedToken(credentials.access_token)
       const refreshed = credentialsFromToken(token, credentials.user_id, credentials.username)
       await saveCredentials(path, refreshed)
       log('Refreshed access token.')
+      console.log(`Use saved login for ${account}.`)
       return refreshed
     } catch (error) {
       log(`Token refresh failed; starting OAuth (${error instanceof Error ? error.message : String(error)}).`)
+      console.log('Login refresh failed. Start login.')
     }
+  } else {
+    console.log(`No saved login for ${account}. Start login.`)
   }
 
   return authorize(config, path, account)
