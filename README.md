@@ -5,6 +5,26 @@ videos, GIFs, thumbnails, and carousel media with the official Threads API.
 
 [Open the illustrated setup guide](https://ianwu5205.github.io/threads-backup/guide/).
 
+## Changes in v0.3.0
+
+This version backs up replies on your posts, including nested replies and media
+attached to those replies. Each post JSON file now includes a `replies` array.
+
+Reading replies requires the `threads_read_replies` permission. Tokens saved by
+earlier versions do not include it, so an existing login cannot read replies
+until you authorize the account again:
+
+```sh
+threads-backup --account your_threads_username --auth
+```
+
+That overwrites `.credentials/{username}.json` and then starts the backup.
+Enable `threads_read_replies` on the Meta app as well. In development mode, an
+app tester can grant it without App Review.
+
+Posts already on disk pick up replies on the next `--resume` or `--full-backup`
+run.
+
 ## Requirements
 
 - Node.js 24 or newer
@@ -188,12 +208,6 @@ Media attached to the post, its carousel children, and its replies is
 downloaded. Media belonging to quoted or reposted third-party posts is not
 downloaded. Posts saved before replies were archived pick up the `replies`
 array on the next `--resume` or `--full-backup` run.
-
-## Breaking change
-
-Backups now use `backups/{username}/{year}/` instead of `backups/{year}/`.
-Existing backup folders are not migrated or checked, so the first account-scoped
-run can download those posts again. The old folders are left untouched.
 
 ## Security and API access
 
