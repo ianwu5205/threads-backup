@@ -55,7 +55,8 @@ export function quickTunnelUrl(output: string): string | undefined {
 
 /** Read one named tunnel's status from cloudflared JSON output. */
 export function tunnelStatus(output: string, name: string): TunnelStatus | undefined {
-  const tunnels = JSON.parse(output) as TunnelStatus[]
+  const tunnels = JSON.parse(output) as TunnelStatus[] | null
+  if (!Array.isArray(tunnels)) return undefined
   return tunnels.find((tunnel) => tunnel.name === name)
 }
 
@@ -345,7 +346,8 @@ export async function getCredentials(config: OAuthConfig, account: string): Prom
   }
   if (credentials && Date.parse(credentials.expires_at) - Date.now() > refreshBeforeMs) return credentials
 
-  if (credentials && Date.parse(credentials.expires_at) > Date.now()) {
+  // Expiring or already expired: try refresh first, then full OAuth re-auth.
+  if (credentials) {
     try {
       const token = await refreshLongLivedToken(credentials.access_token)
       const refreshed = credentialsFromToken(token, credentials.user_id, credentials.username)

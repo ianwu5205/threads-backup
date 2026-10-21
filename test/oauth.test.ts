@@ -31,6 +31,8 @@ test('tunnelStatus finds active and inactive named tunnels', () => {
   assert.deepEqual(tunnelStatus(output, 'inactive'), { name: 'inactive', connections: [] })
   assert.equal(tunnelStatus(output, 'active')?.connections?.length, 1)
   assert.equal(tunnelStatus(output, 'missing'), undefined)
+  assert.equal(tunnelStatus('null', 'any'), undefined)
+  assert.equal(tunnelStatus('{}', 'any'), undefined)
 })
 
 test('getCredentials migrates a legacy file to a username JSON file', async () => {
